@@ -8,20 +8,28 @@
       {
         "imports": {
           "vue": "https://cdn.jsdelivr.net/npm/vue@3.5.32/dist/vue.esm-browser.js",
+          "vue-router": "https://cdn.jsdelivr.net/npm/vue-router@5.0.4/dist/vue-router.esm-browser.prod.js",
           "@graffiti-garden/implementation-local": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-local@1.2.0/dist/browser/index.js",
           "@graffiti-garden/implementation-decentralized": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-decentralized@0.0.9/dist/browser/index.js",
           "@graffiti-garden/wrapper-vue": "https://cdn.jsdelivr.net/npm/@graffiti-garden/wrapper-vue@1.2.2/dist/browser/plugin.mjs"
         }
       }
     </script>
-    <script src="index.js" type="module"></script>
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/main.js" type="module"></script>
   </head>
   <body>
     <div id="app">Loading…</div>
-    <template id="template">
+    <template id="template-app">
       <div class="app">
-        <div v-if="!$graffitiSession.value" class="auth-screen">
+        <div v-if="$graffitiSession.value === undefined" class="auth-screen">
+          <div class="auth-card">
+            <h1 class="auth-title">Chappystick</h1>
+            <p class="auth-sub">Loading…</p>
+          </div>
+        </div>
+
+        <div v-else-if="$graffitiSession.value === null" class="auth-screen">
           <div class="auth-card">
             <h1 class="auth-title">Chappystick</h1>
             <p class="auth-sub">Team chat on Graffiti</p>
@@ -33,13 +41,13 @@
 
         <div v-else class="layout">
           <aside class="sidebar">
-            <div class="sidebar-brand">
+            <router-link class="sidebar-brand sidebar-brand-link" to="/">
               <span class="sidebar-logo">◆</span>
               <div>
                 <div class="sidebar-name">Chappystick</div>
-                <div class="sidebar-tag">Teams</div>
+                <div class="sidebar-tag">Home · Teams</div>
               </div>
-            </div>
+            </router-link>
 
             <div class="sidebar-section">
               <label class="field-label">New team</label>
@@ -98,15 +106,14 @@
                   :key="t.channel"
                   class="team-nav-row"
                 >
-                  <button
-                    type="button"
+                  <router-link
                     class="team-nav-item"
-                    :class="{ active: t.channel === channel }"
-                    @click="changeChat(t.channel)"
+                    :class="{ active: t.channel === activeChatId }"
+                    :to="{ name: 'chat', params: { chatID: t.channel } }"
                   >
                     <span class="team-nav-title">{{ t.title }}</span>
                     <span class="team-nav-meta">{{ t.channel.slice(0, 8) }}…</span>
-                  </button>
+                  </router-link>
                   <button
                     type="button"
                     class="team-leave-btn"
@@ -132,171 +139,383 @@
           </aside>
 
           <main class="main">
-            <template v-if="channel">
-              <header class="main-header">
-                <div>
-                  <h2 class="main-title">{{ currentTeamTitle }}</h2>
-                  <p class="main-sub join-code-row">
-                    <span class="join-code-label">Join code</span>
-                    <code class="inline-code join-code-value">{{ channel }}</code>
-                    <button
-                      type="button"
-                      class="btn btn-ghost btn-copy-code"
-                      @click="copyTeamCode"
-                      :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
-                    >
-                      {{ teamCodeJustCopied ? "Copied" : "Copy" }}
-                    </button>
-                  </p>
-                </div>
-              </header>
-
-              <section class="meetings-panel">
-                <div class="panel-head">
-                  <h3 class="panel-title">Schedule a meeting</h3>
-                </div>
-                <form class="meeting-form" @submit.prevent="schedMeeting()">
-                  <input
-                    class="input meeting-form-name"
-                    type="text"
-                    v-model="meetingName"
-                    placeholder="Meeting name"
-                    autocomplete="off"
-                  />
-                  <input
-                    class="input"
-                    type="datetime-local"
-                    v-model="meetingDateTime"
-                    title="Date and time"
-                  />
-                  <input
-                    class="input"
-                    type="text"
-                    v-model="meetingLocation"
-                    placeholder="Location"
-                    autocomplete="off"
-                  />
-                  <div class="meeting-form-actions">
-                    <button
-                      type="submit"
-                      class="btn btn-primary"
-                      :disabled="
-                        !meetingName.trim() ||
-                        !meetingDateTime ||
-                        isScheduling
-                      "
-                    >
-                      {{ isScheduling ? "Scheduling…" : "Add meeting" }}
-                    </button>
-                  </div>
-                </form>
-                <div class="meetings-list-wrap">
-                  <p v-if="areMeetingObjectsLoading" class="muted loading-line">
-                    Loading meetings…
-                  </p>
-                  <ul v-else-if="sortedMeetingObjects.length" class="meetings-list">
-                    <li
-                      v-for="object of sortedMeetingObjects"
-                      :key="object.url"
-                      class="meeting-card"
-                      :class="{ 'meeting-card--past': isMeetingPast(object) }"
-                    >
-                      <div class="meeting-card-head">
-                        <div class="meeting-name-row">
-                          <span class="meeting-name">{{
-                            object.value.name
-                          }}</span>
-                          <span
-                            v-if="isMeetingPast(object)"
-                            class="meeting-pill meeting-pill-past"
-                            >Past</span>
-                        </div>
-                        <span class="meeting-when">{{
-                          new Date(
-                            object.value.startsAt ??
-                              object.value.date ??
-                              object.value.published,
-                          ).toLocaleString(undefined, {
-                            dateStyle: "medium",
-                            timeStyle: "short",
-                          })
-                        }}</span>
-                      </div>
-                      <div class="meeting-loc" v-if="object.value.location != null">
-                        <span class="meeting-loc-label">Where</span>
-                        <span class="meeting-loc-text">{{
-                          object.value.location
-                        }}</span>
-                      </div>
-                    </li>
-                  </ul>
-                  <p v-else class="muted">No meetings scheduled yet.</p>
-                </div>
-              </section>
-
-              <section class="messages-panel">
-                <p v-if="areMessageObjectsLoading" class="muted messages-status">
-                  Loading messages…
-                </p>
-                <ul v-else class="messages-list">
-                  <li
-                    v-for="object of sortedMessageObjects"
-                    :key="object.url"
-                    class="message-row"
-                  >
-                    <div class="message-bubble">
-                      <div class="message-meta">
-                        <strong class="message-author">
-                          <graffiti-actor-to-handle
-                            :actor="object.actor"
-                          ></graffiti-actor-to-handle>
-                        </strong>
-                        <button
-                          v-if="object.actor === $graffitiSession.value?.actor"
-                          type="button"
-                          class="btn-icon"
-                          @click="deleteMessage(object)"
-                          :disabled="isDeleting.has(object.url)"
-                          title="Delete"
-                        >
-                          {{ isDeleting.has(object.url) ? "…" : "✕" }}
-                        </button>
-                      </div>
-                      <p class="message-body">{{ object.value.content }}</p>
-                    </div>
-                  </li>
-                </ul>
-              </section>
-
-              <footer class="composer">
-                <form class="composer-form" @submit.prevent="sendMessage()">
-                  <input
-                    class="input composer-input"
-                    type="text"
-                    v-model="myMessage"
-                    placeholder="Write a message…"
-                    autocomplete="off"
-                  />
-                  <button
-                    type="submit"
-                    class="btn btn-primary composer-send"
-                    :disabled="!myMessage || isSending"
-                  >
-                    {{ isSending ? "…" : "Send" }}
-                  </button>
-                </form>
-              </footer>
-            </template>
-
-            <div v-else class="main-empty">
-              <p class="main-empty-title">Pick a team</p>
-              <p class="main-empty-text">
-                Choose a team from the sidebar, create a new one, or join with a
-                team id.
-              </p>
-            </div>
+            <router-view />
           </main>
         </div>
+      </div>
+    </template>
+
+    <template id="template-home">
+      <div class="home-view">
+        <section class="home-meetings">
+          <div class="panel-head">
+            <h3 class="panel-title">Your meetings</h3>
+            <p class="panel-sub">Across every team you belong to</p>
+          </div>
+          <p v-if="areAllMeetingsLoading" class="muted loading-line">
+            Loading meetings…
+          </p>
+          <ul
+            v-else-if="allMeetingsDisplay.length"
+            class="home-meetings-list"
+          >
+            <li
+              v-for="row in allMeetingsDisplay"
+              :key="row.object.url"
+              class="home-meeting-row"
+            >
+              <div class="home-meeting-main">
+                <router-link
+                  v-if="row.object.value.meetingId"
+                  class="home-meeting-title-link"
+                  :to="{
+                    name: 'meeting',
+                    params: { meetingID: row.object.value.meetingId },
+                  }"
+                >
+                  {{ row.object.value.name }}
+                </router-link>
+                <span v-else class="home-meeting-title">{{
+                  row.object.value.name
+                }}</span>
+                <span class="home-meeting-when">{{
+                  new Date(
+                    row.object.value.startsAt ??
+                      row.object.value.date ??
+                      row.object.value.published,
+                  ).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })
+                }}</span>
+              </div>
+              <div class="home-meeting-meta">
+                <router-link
+                  class="home-meeting-team-link"
+                  :to="{ name: 'chat', params: { chatID: row.teamChannel } }"
+                  >{{ row.teamTitle }}</router-link
+                >
+              </div>
+            </li>
+          </ul>
+          <p v-else class="muted">No meetings yet.</p>
+        </section>
+
+        <div class="main-empty">
+          <p class="main-empty-title">No chat open</p>
+          <p class="main-empty-text">
+            Pick a team in the sidebar or open
+            <code class="inline-code">/chat/&lt;team-id&gt;</code>.
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <template id="template-chat">
+      <div class="chat-route">
+        <header class="main-header">
+          <div>
+            <h2 class="main-title">{{ currentTeamTitle }}</h2>
+            <p class="main-sub join-code-row">
+              <span class="join-code-label">Join code</span>
+              <code class="inline-code join-code-value">{{ channel }}</code>
+              <button
+                type="button"
+                class="btn btn-ghost btn-copy-code"
+                @click="copyTeamCode"
+                :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
+              >
+                {{ teamCodeJustCopied ? "Copied" : "Copy" }}
+              </button>
+            </p>
+          </div>
+        </header>
+
+        <section class="meetings-panel">
+          <div class="panel-head">
+            <h3 class="panel-title">Schedule a meeting</h3>
+          </div>
+          <form class="meeting-form" @submit.prevent="schedMeeting()">
+            <input
+              class="input meeting-form-name"
+              type="text"
+              v-model="meetingName"
+              placeholder="Meeting name"
+              autocomplete="off"
+            />
+            <input
+              class="input"
+              type="datetime-local"
+              v-model="meetingDateTime"
+              title="Date and time"
+            />
+            <input
+              class="input"
+              type="text"
+              v-model="meetingLocation"
+              placeholder="Location"
+              autocomplete="off"
+            />
+            <div class="meeting-form-actions">
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="
+                  !meetingName.trim() || !meetingDateTime || isScheduling
+                "
+              >
+                {{ isScheduling ? "Scheduling…" : "Add meeting" }}
+              </button>
+            </div>
+          </form>
+          <div class="meetings-list-wrap">
+            <p v-if="areMeetingObjectsLoading" class="muted loading-line">
+              Loading meetings…
+            </p>
+            <ul v-else-if="sortedMeetingObjects.length" class="meetings-list">
+              <li
+                v-for="object of sortedMeetingObjects"
+                :key="object.url"
+                class="meeting-card"
+                :class="{ 'meeting-card--past': isMeetingPast(object) }"
+              >
+                <div class="meeting-card-head">
+                  <div class="meeting-name-row">
+                    <span class="meeting-name">
+                      <router-link
+                        v-if="object.value.meetingId"
+                        class="meeting-title-link"
+                        :to="{
+                          name: 'meeting',
+                          params: { meetingID: object.value.meetingId },
+                        }"
+                        >{{ object.value.name }}</router-link
+                      >
+                      <template v-else>{{ object.value.name }}</template>
+                    </span>
+                    <span
+                      v-if="isMeetingPast(object)"
+                      class="meeting-pill meeting-pill-past"
+                      >Past</span>
+                  </div>
+                  <span class="meeting-when">{{
+                    new Date(
+                      object.value.startsAt ??
+                        object.value.date ??
+                        object.value.published,
+                    ).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })
+                  }}</span>
+                </div>
+                <div class="meeting-loc" v-if="object.value.location != null">
+                  <span class="meeting-loc-label">Where</span>
+                  <span class="meeting-loc-text">{{
+                    object.value.location
+                  }}</span>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="muted">No meetings scheduled yet.</p>
+          </div>
+        </section>
+
+        <section class="messages-panel">
+          <p v-if="areMessageObjectsLoading" class="muted messages-status">
+            Loading messages…
+          </p>
+          <ul v-else class="messages-list">
+            <li
+              v-for="object of sortedFeedObjects"
+              :key="object.url"
+              class="message-row"
+              :class="{ 'message-row--announcement': isAnnouncementObject(object) }"
+            >
+              <div
+                v-if="isAnnouncementObject(object)"
+                class="message-bubble message-bubble--announcement"
+              >
+                <p class="announcement-title">
+                  <span class="announcement-badge">Meeting</span>
+                  New:
+                  <router-link
+                    class="announcement-meeting-link"
+                    :to="{
+                      name: 'meeting',
+                      params: { meetingID: object.value.meetingId },
+                    }"
+                    >{{ object.value.name }}</router-link
+                  >
+                </p>
+                <p class="announcement-detail muted">
+                  {{ new Date(object.value.startsAt).toLocaleString(undefined, {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }) }}
+                  · {{ object.value.location }}
+                </p>
+                <div class="rsvp-row">
+                  <span
+                    v-if="latestOwnRsvp(object.value.meetingId)"
+                    class="rsvp-your muted"
+                    >You:
+                    {{ latestOwnRsvp(object.value.meetingId).value.response }}</span
+                  >
+                  <button
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    :disabled="
+                      rsvpBusy.has(object.value.meetingId + ':yes')
+                    "
+                    @click="submitRsvp(object.value.meetingId, 'yes')"
+                  >
+                    RSVP yes
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    :disabled="
+                      rsvpBusy.has(object.value.meetingId + ':no')
+                    "
+                    @click="submitRsvp(object.value.meetingId, 'no')"
+                  >
+                    RSVP no
+                  </button>
+                  <button
+                    v-if="object.actor === $graffitiSession.value?.actor"
+                    type="button"
+                    class="btn-icon"
+                    @click="deleteMessage(object)"
+                    :disabled="isDeleting.has(object.url)"
+                    title="Delete announcement"
+                  >
+                    {{ isDeleting.has(object.url) ? "…" : "✕" }}
+                  </button>
+                </div>
+              </div>
+              <div v-else class="message-bubble">
+                <div class="message-meta">
+                  <strong class="message-author">
+                    <graffiti-actor-to-handle
+                      :actor="object.actor"
+                    ></graffiti-actor-to-handle>
+                  </strong>
+                  <button
+                    v-if="object.actor === $graffitiSession.value?.actor"
+                    type="button"
+                    class="btn-icon"
+                    @click="deleteMessage(object)"
+                    :disabled="isDeleting.has(object.url)"
+                    title="Delete"
+                  >
+                    {{ isDeleting.has(object.url) ? "…" : "✕" }}
+                  </button>
+                </div>
+                <p class="message-body">{{ object.value.content }}</p>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <footer class="composer">
+          <form class="composer-form" @submit.prevent="sendMessage()">
+            <input
+              class="input composer-input"
+              type="text"
+              v-model="myMessage"
+              placeholder="Write a message…"
+              autocomplete="off"
+            />
+            <button
+              type="submit"
+              class="btn btn-primary composer-send"
+              :disabled="!myMessage || isSending"
+            >
+              {{ isSending ? "…" : "Send" }}
+            </button>
+          </form>
+        </footer>
+      </div>
+    </template>
+
+    <template id="template-meeting">
+      <div class="meeting-page">
+        <p v-if="meetingsLoading" class="muted loading-line">Loading…</p>
+        <div v-else-if="notFound" class="main-empty">
+          <p class="main-empty-title">Meeting not found</p>
+          <p class="main-empty-text">
+            It may have been removed or you may not have access to that team.
+          </p>
+          <router-link class="btn btn-secondary" to="/">Home</router-link>
+        </div>
+        <template v-else-if="meetingObject">
+          <header class="main-header meeting-page-header">
+            <router-link class="btn btn-ghost btn-back" to="/">← Home</router-link>
+            <router-link
+              v-if="meetingChannel"
+              class="btn btn-ghost btn-back"
+              :to="{ name: 'chat', params: { chatID: meetingChannel } }"
+              >Team chat</router-link
+            >
+          </header>
+          <div class="meeting-page-body">
+            <h2 class="meeting-page-title">{{ meetingObject.value.name }}</h2>
+            <p class="meeting-page-team muted">Team: {{ teamTitle }}</p>
+            <dl class="meeting-page-dl">
+              <dt>When</dt>
+              <dd>
+                {{
+                  new Date(
+                    meetingObject.value.startsAt ??
+                      meetingObject.value.date ??
+                      meetingObject.value.published,
+                  ).toLocaleString(undefined, {
+                    dateStyle: "full",
+                    timeStyle: "short",
+                  })
+                }}
+              </dd>
+              <dt>Where</dt>
+              <dd>{{ meetingObject.value.location }}</dd>
+            </dl>
+            <div class="meeting-page-rsvp-summary">
+              <span class="rsvp-pill rsvp-pill-yes">{{ yesCount }} yes</span>
+              <span class="rsvp-pill rsvp-pill-no">{{ noCount }} no</span>
+            </div>
+            <div class="rsvp-row meeting-page-rsvp-actions">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm"
+                @click="postRsvp('yes')"
+              >
+                RSVP yes
+              </button>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                @click="postRsvp('no')"
+              >
+                RSVP no
+              </button>
+            </div>
+            <h3 class="meeting-rsvp-heading">Who responded</h3>
+            <p v-if="rsvpsLoading && !rsvpRows.length" class="muted">Loading…</p>
+            <ul v-else-if="rsvpRows.length" class="meeting-rsvp-list">
+              <li v-for="o in rsvpRows" :key="o.url" class="meeting-rsvp-row">
+                <graffiti-actor-to-handle :actor="o.actor"></graffiti-actor-to-handle>
+                <span
+                  class="rsvp-tag"
+                  :class="
+                    o.value.response === 'yes' ? 'rsvp-tag-yes' : 'rsvp-tag-no'
+                  "
+                  >{{ o.value.response }}</span
+                >
+              </li>
+            </ul>
+            <p v-else class="muted">No RSVPs yet.</p>
+          </div>
+        </template>
       </div>
     </template>
   </body>
