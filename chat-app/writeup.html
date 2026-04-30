@@ -1,0 +1,74 @@
+<h1>Chat App Prototype Mockup</h1>
+
+<h2>Chats</h2>
+<p>
+  <strong>What:</strong> The chats have a randomly generated channel id, as well
+  as a title, which are data that need to be persisted and shared. There are
+  also additional graffiti objects to allow joiners to be detected and see team
+  data.
+</p>
+<p>
+  <strong>Where:</strong>Anyone using the app can discover any of the teams, as
+  long as they've joined that team. So, we've used a hardcoded channel
+  "chappystick-v1" for the where.
+</p>
+<p>
+  <strong>Who:</strong> Only people that made a chat can see it. So, we make an
+  allowed list that starts with just the creator id.
+</p>
+
+<h2>Bookmarks</h2>
+<p>
+  <strong>What:</strong> These are the names for chats that the user joins,
+  rather than creates. They essentially have the same data as chats, with
+  channel and title. They are eventually merged with chats to represent all the
+  chats the user is in.
+</p>
+<p>
+  <strong>Where:</strong>For the same reason as above, these use the
+  "chappystick-v1" channel.
+</p>
+<p>
+  <strong>Who:</strong> People can see this when they join the team, so they are
+  put in the allowed list.
+</p>
+
+<h2>Messages</h2>
+<p>
+  <strong>What:</strong>These messages have a content attribute as well as a
+  published date.
+</p>
+<p>
+  <strong>Where:</strong>These are in a single current channel, so they are in
+  channel.value.
+</p>
+<p>
+  <strong>Who:</strong> Anyone in the channel can see the message, so no allowed
+  list needed.
+</p>
+
+<h2>Meetings</h2>
+<p>
+  <strong>What:</strong> Meetings need name, time, date, and location data to be
+  useful.
+</p>
+<p>
+  <strong>Where:</strong>Meetings are seen in their associated current channel,
+  so they are in channel.value.
+</p>
+<p>
+  <strong>Who:</strong> People can see the meetings when if they are in the
+  channel, so no allow list is needed.
+</p>
+
+<h2>Other design decisions</h2>
+<p>
+  While this is a small mockup of the chat app design, I still made sure to
+  follow design principles. I included a copy button for the team id/join code
+  for efficiency, and made the meeting time to autofill to 7pm for the current
+  day to hopefully reduce the keystrokes needed to schedule a meeting. This
+  could however be more optimized with user testing. For safety, I included the
+  ability to leave a group. For learnability and efficiency, I made the nearest
+  meetings in the meetings header sort to the top so that new users can
+  immediately see the most important information.
+</p>

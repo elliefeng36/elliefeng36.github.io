@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chappystick</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "vue": "https://cdn.jsdelivr.net/npm/vue@3.5.32/dist/vue.esm-browser.js",
+          "@graffiti-garden/implementation-local": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-local@1.2.0/dist/browser/index.js",
+          "@graffiti-garden/implementation-decentralized": "https://cdn.jsdelivr.net/npm/@graffiti-garden/implementation-decentralized@0.0.9/dist/browser/index.js",
+          "@graffiti-garden/wrapper-vue": "https://cdn.jsdelivr.net/npm/@graffiti-garden/wrapper-vue@1.2.2/dist/browser/plugin.mjs"
+        }
+      }
+    </script>
+    <script src="index.js" type="module"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app">Loading…</div>
+    <template id="template">
+      <div class="app">
+        <div v-if="!$graffitiSession.value" class="auth-screen">
+          <div class="auth-card">
+            <h1 class="auth-title">Chappystick</h1>
+            <p class="auth-sub">Team chat on Graffiti</p>
+            <button type="button" class="btn btn-primary" @click="$graffiti.login()">
+              Log in
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="layout">
+          <aside class="sidebar">
+            <div class="sidebar-brand">
+              <span class="sidebar-logo">◆</span>
+              <div>
+                <div class="sidebar-name">Chappystick</div>
+                <div class="sidebar-tag">Teams</div>
+              </div>
+            </div>
+
+            <div class="sidebar-section">
+              <label class="field-label">New team</label>
+              <form class="stack-form" @submit.prevent="newChat()">
+                <input
+                  class="input"
+                  type="text"
+                  v-model="newChatName"
+                  placeholder="Team name"
+                  autocomplete="off"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-secondary btn-block"
+                  :disabled="!newChatName || isCreating"
+                >
+                  {{ isCreating ? "Creating…" : "Create team" }}
+                </button>
+              </form>
+            </div>
+
+            <div class="sidebar-section">
+              <label class="field-label">Join with team id</label>
+              <form class="stack-form" @submit.prevent="joinTeam()">
+                <input
+                  class="input input-mono"
+                  type="text"
+                  v-model="teamCode"
+                  placeholder="UUID join code"
+                  autocomplete="off"
+                />
+                <button
+                  type="submit"
+                  class="btn btn-ghost btn-block"
+                  :disabled="!teamCode.trim() || isJoining"
+                >
+                  {{ isJoining ? "Joining…" : "Join team" }}
+                </button>
+              </form>
+              <p v-if="joinError" class="field-error">{{ joinError }}</p>
+            </div>
+
+            <div class="sidebar-section sidebar-section-grow">
+              <div class="field-label row-between">
+                <span>Your teams</span>
+                <span class="badge" v-if="mergedTeams.length">{{
+                  mergedTeams.length
+                }}</span>
+              </div>
+              <p v-if="!mergedTeams.length" class="sidebar-empty">
+                No teams yet. Create one or paste a join code.
+              </p>
+              <nav class="team-nav" v-else>
+                <div
+                  v-for="t in mergedTeams"
+                  :key="t.channel"
+                  class="team-nav-row"
+                >
+                  <button
+                    type="button"
+                    class="team-nav-item"
+                    :class="{ active: t.channel === channel }"
+                    @click="changeChat(t.channel)"
+                  >
+                    <span class="team-nav-title">{{ t.title }}</span>
+                    <span class="team-nav-meta">{{ t.channel.slice(0, 8) }}…</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="team-leave-btn"
+                    :disabled="leavingTeamChannel === t.channel"
+                    title="Leave team"
+                    @click.stop="leaveTeam(t.channel)"
+                  >
+                    {{ leavingTeamChannel === t.channel ? "…" : "Leave" }}
+                  </button>
+                </div>
+              </nav>
+            </div>
+
+            <div class="sidebar-footer">
+              <button
+                type="button"
+                class="btn btn-ghost btn-block"
+                @click="$graffiti.logout($graffitiSession.value)"
+              >
+                Log out
+              </button>
+            </div>
+          </aside>
+
+          <main class="main">
+            <template v-if="channel">
+              <header class="main-header">
+                <div>
+                  <h2 class="main-title">{{ currentTeamTitle }}</h2>
+                  <p class="main-sub join-code-row">
+                    <span class="join-code-label">Join code</span>
+                    <code class="inline-code join-code-value">{{ channel }}</code>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-copy-code"
+                      @click="copyTeamCode"
+                      :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
+                    >
+                      {{ teamCodeJustCopied ? "Copied" : "Copy" }}
+                    </button>
+                  </p>
+                </div>
+              </header>
+
+              <section class="meetings-panel">
+                <div class="panel-head">
+                  <h3 class="panel-title">Schedule a meeting</h3>
+                </div>
+                <form class="meeting-form" @submit.prevent="schedMeeting()">
+                  <input
+                    class="input meeting-form-name"
+                    type="text"
+                    v-model="meetingName"
+                    placeholder="Meeting name"
+                    autocomplete="off"
+                  />
+                  <input
+                    class="input"
+                    type="datetime-local"
+                    v-model="meetingDateTime"
+                    title="Date and time"
+                  />
+                  <input
+                    class="input"
+                    type="text"
+                    v-model="meetingLocation"
+                    placeholder="Location"
+                    autocomplete="off"
+                  />
+                  <div class="meeting-form-actions">
+                    <button
+                      type="submit"
+                      class="btn btn-primary"
+                      :disabled="
+                        !meetingName.trim() ||
+                        !meetingDateTime ||
+                        isScheduling
+                      "
+                    >
+                      {{ isScheduling ? "Scheduling…" : "Add meeting" }}
+                    </button>
+                  </div>
+                </form>
+                <div class="meetings-list-wrap">
+                  <p v-if="areMeetingObjectsLoading" class="muted loading-line">
+                    Loading meetings…
+                  </p>
+                  <ul v-else-if="sortedMeetingObjects.length" class="meetings-list">
+                    <li
+                      v-for="object of sortedMeetingObjects"
+                      :key="object.url"
+                      class="meeting-card"
+                      :class="{ 'meeting-card--past': isMeetingPast(object) }"
+                    >
+                      <div class="meeting-card-head">
+                        <div class="meeting-name-row">
+                          <span class="meeting-name">{{
+                            object.value.name
+                          }}</span>
+                          <span
+                            v-if="isMeetingPast(object)"
+                            class="meeting-pill meeting-pill-past"
+                            >Past</span>
+                        </div>
+                        <span class="meeting-when">{{
+                          new Date(
+                            object.value.startsAt ??
+                              object.value.date ??
+                              object.value.published,
+                          ).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })
+                        }}</span>
+                      </div>
+                      <div class="meeting-loc" v-if="object.value.location != null">
+                        <span class="meeting-loc-label">Where</span>
+                        <span class="meeting-loc-text">{{
+                          object.value.location
+                        }}</span>
+                      </div>
+                    </li>
+                  </ul>
+                  <p v-else class="muted">No meetings scheduled yet.</p>
+                </div>
+              </section>
+
+              <section class="messages-panel">
+                <p v-if="areMessageObjectsLoading" class="muted messages-status">
+                  Loading messages…
+                </p>
+                <ul v-else class="messages-list">
+                  <li
+                    v-for="object of sortedMessageObjects"
+                    :key="object.url"
+                    class="message-row"
+                  >
+                    <div class="message-bubble">
+                      <div class="message-meta">
+                        <strong class="message-author">
+                          <graffiti-actor-to-handle
+                            :actor="object.actor"
+                          ></graffiti-actor-to-handle>
+                        </strong>
+                        <button
+                          v-if="object.actor === $graffitiSession.value?.actor"
+                          type="button"
+                          class="btn-icon"
+                          @click="deleteMessage(object)"
+                          :disabled="isDeleting.has(object.url)"
+                          title="Delete"
+                        >
+                          {{ isDeleting.has(object.url) ? "…" : "✕" }}
+                        </button>
+                      </div>
+                      <p class="message-body">{{ object.value.content }}</p>
+                    </div>
+                  </li>
+                </ul>
+              </section>
+
+              <footer class="composer">
+                <form class="composer-form" @submit.prevent="sendMessage()">
+                  <input
+                    class="input composer-input"
+                    type="text"
+                    v-model="myMessage"
+                    placeholder="Write a message…"
+                    autocomplete="off"
+                  />
+                  <button
+                    type="submit"
+                    class="btn btn-primary composer-send"
+                    :disabled="!myMessage || isSending"
+                  >
+                    {{ isSending ? "…" : "Send" }}
+                  </button>
+                </form>
+              </footer>
+            </template>
+
+            <div v-else class="main-empty">
+              <p class="main-empty-title">Pick a team</p>
+              <p class="main-empty-text">
+                Choose a team from the sidebar, create a new one, or join with a
+                team id.
+              </p>
+            </div>
+          </main>
+        </div>
+      </div>
+    </template>
+  </body>
+</html>
