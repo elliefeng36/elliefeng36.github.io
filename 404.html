@@ -33,7 +33,11 @@
           <div class="auth-card">
             <h1 class="auth-title">Chappystick</h1>
             <p class="auth-sub">Team chat on Graffiti</p>
-            <button type="button" class="btn btn-primary" @click="$graffiti.login()">
+            <button
+              type="button"
+              class="btn btn-primary"
+              @click="$graffiti.login()"
+            >
               Log in
             </button>
           </div>
@@ -45,7 +49,6 @@
               <span class="sidebar-logo">◆</span>
               <div>
                 <div class="sidebar-name">Chappystick</div>
-                <div class="sidebar-tag">Home · Teams</div>
               </div>
             </router-link>
 
@@ -93,9 +96,6 @@
             <div class="sidebar-section sidebar-section-grow">
               <div class="field-label row-between">
                 <span>Your teams</span>
-                <span class="badge" v-if="mergedTeams.length">{{
-                  mergedTeams.length
-                }}</span>
               </div>
               <p v-if="!mergedTeams.length" class="sidebar-empty">
                 No teams yet. Create one or paste a join code.
@@ -112,7 +112,9 @@
                     :to="{ name: 'chat', params: { chatID: t.channel } }"
                   >
                     <span class="team-nav-title">{{ t.title }}</span>
-                    <span class="team-nav-meta">{{ t.channel.slice(0, 8) }}…</span>
+                    <span class="team-nav-meta"
+                      >{{ t.channel.slice(0, 8) }}…</span
+                    >
                   </router-link>
                   <button
                     type="button"
@@ -229,24 +231,20 @@
                     <span
                       v-if="isMeetingPast(object)"
                       class="meeting-pill meeting-pill-past"
-                      >Past</span>
+                      >Past</span
+                    >
                   </div>
-                  <span class="meeting-when">{{
-                    new Date(
-                      object.value.startsAt ??
-                        object.value.date ??
-                        object.value.published,
-                    ).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })
-                  }}</span>
+                  <span class="meeting-when"
+                    >{{ new Date( object.value.startsAt ?? object.value.date ??
+                    object.value.published, ).toLocaleString(undefined, {
+                    dateStyle: "medium", timeStyle: "short", }) }}</span
+                  >
                 </div>
                 <div class="meeting-loc" v-if="object.value.location != null">
                   <span class="meeting-loc-label">Where</span>
-                  <span class="meeting-loc-text">{{
-                    object.value.location
-                  }}</span>
+                  <span class="meeting-loc-text"
+                    >{{ object.value.location }}</span
+                  >
                 </div>
               </li>
             </ul>

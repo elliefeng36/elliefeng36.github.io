@@ -33,7 +33,11 @@
           <div class="auth-card">
             <h1 class="auth-title">Chappystick</h1>
             <p class="auth-sub">Team chat on Graffiti</p>
-            <button type="button" class="btn btn-primary" @click="$graffiti.login()">
+            <button
+              type="button"
+              class="btn btn-primary"
+              @click="$graffiti.login()"
+            >
               Log in
             </button>
           </div>
@@ -45,7 +49,6 @@
               <span class="sidebar-logo">◆</span>
               <div>
                 <div class="sidebar-name">Chappystick</div>
-                <div class="sidebar-tag">Home · Teams</div>
               </div>
             </router-link>
 
@@ -93,9 +96,6 @@
             <div class="sidebar-section sidebar-section-grow">
               <div class="field-label row-between">
                 <span>Your teams</span>
-                <span class="badge" v-if="mergedTeams.length">{{
-                  mergedTeams.length
-                }}</span>
               </div>
               <p v-if="!mergedTeams.length" class="sidebar-empty">
                 No teams yet. Create one or paste a join code.
@@ -112,7 +112,9 @@
                     :to="{ name: 'chat', params: { chatID: t.channel } }"
                   >
                     <span class="team-nav-title">{{ t.title }}</span>
-                    <span class="team-nav-meta">{{ t.channel.slice(0, 8) }}…</span>
+                    <span class="team-nav-meta"
+                      >{{ t.channel.slice(0, 8) }}…</span
+                    >
                   </router-link>
                   <button
                     type="button"
@@ -155,10 +157,7 @@
           <p v-if="areAllMeetingsLoading" class="muted loading-line">
             Loading meetings…
           </p>
-          <ul
-            v-else-if="allMeetingsDisplay.length"
-            class="home-meetings-list"
-          >
+          <ul v-else-if="allMeetingsDisplay.length" class="home-meetings-list">
             <li
               v-for="row in allMeetingsDisplay"
               :key="row.object.url"
@@ -175,19 +174,15 @@
                 >
                   {{ row.object.value.name }}
                 </router-link>
-                <span v-else class="home-meeting-title">{{
-                  row.object.value.name
-                }}</span>
-                <span class="home-meeting-when">{{
-                  new Date(
-                    row.object.value.startsAt ??
-                      row.object.value.date ??
-                      row.object.value.published,
-                  ).toLocaleString(undefined, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })
-                }}</span>
+                <span v-else class="home-meeting-title"
+                  >{{ row.object.value.name }}</span
+                >
+                <span class="home-meeting-when"
+                  >{{ new Date( row.object.value.startsAt ??
+                  row.object.value.date ?? row.object.value.published,
+                  ).toLocaleString(undefined, { dateStyle: "medium", timeStyle:
+                  "short", }) }}</span
+                >
               </div>
               <div class="home-meeting-meta">
                 <router-link
@@ -296,24 +291,20 @@
                     <span
                       v-if="isMeetingPast(object)"
                       class="meeting-pill meeting-pill-past"
-                      >Past</span>
+                      >Past</span
+                    >
                   </div>
-                  <span class="meeting-when">{{
-                    new Date(
-                      object.value.startsAt ??
-                        object.value.date ??
-                        object.value.published,
-                    ).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })
-                  }}</span>
+                  <span class="meeting-when"
+                    >{{ new Date( object.value.startsAt ?? object.value.date ??
+                    object.value.published, ).toLocaleString(undefined, {
+                    dateStyle: "medium", timeStyle: "short", }) }}</span
+                  >
                 </div>
                 <div class="meeting-loc" v-if="object.value.location != null">
                   <span class="meeting-loc-label">Where</span>
-                  <span class="meeting-loc-text">{{
-                    object.value.location
-                  }}</span>
+                  <span class="meeting-loc-text"
+                    >{{ object.value.location }}</span
+                  >
                 </div>
               </li>
             </ul>
@@ -350,17 +341,16 @@
                 </p>
                 <p class="announcement-detail muted">
                   {{ new Date(object.value.startsAt).toLocaleString(undefined, {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  }) }}
-                  · {{ object.value.location }}
+                  dateStyle: "medium", timeStyle: "short", }) }} · {{
+                  object.value.location }}
                 </p>
                 <div class="rsvp-row">
                   <span
                     v-if="latestOwnRsvp(object.value.meetingId)"
                     class="rsvp-your muted"
-                    >You:
-                    {{ latestOwnRsvp(object.value.meetingId).value.response }}</span
+                    >You: {{
+                    latestOwnRsvp(object.value.meetingId).value.response
+                    }}</span
                   >
                   <button
                     type="button"
@@ -451,7 +441,9 @@
         </div>
         <template v-else-if="meetingObject">
           <header class="main-header meeting-page-header">
-            <router-link class="btn btn-ghost btn-back" to="/">← Home</router-link>
+            <router-link class="btn btn-ghost btn-back" to="/"
+              >← Home</router-link
+            >
             <router-link
               v-if="meetingChannel"
               class="btn btn-ghost btn-back"
@@ -465,16 +457,10 @@
             <dl class="meeting-page-dl">
               <dt>When</dt>
               <dd>
-                {{
-                  new Date(
-                    meetingObject.value.startsAt ??
-                      meetingObject.value.date ??
-                      meetingObject.value.published,
-                  ).toLocaleString(undefined, {
-                    dateStyle: "full",
-                    timeStyle: "short",
-                  })
-                }}
+                {{ new Date( meetingObject.value.startsAt ??
+                meetingObject.value.date ?? meetingObject.value.published,
+                ).toLocaleString(undefined, { dateStyle: "full", timeStyle:
+                "short", }) }}
               </dd>
               <dt>Where</dt>
               <dd>{{ meetingObject.value.location }}</dd>
@@ -500,10 +486,14 @@
               </button>
             </div>
             <h3 class="meeting-rsvp-heading">Who responded</h3>
-            <p v-if="rsvpsLoading && !rsvpRows.length" class="muted">Loading…</p>
+            <p v-if="rsvpsLoading && !rsvpRows.length" class="muted">
+              Loading…
+            </p>
             <ul v-else-if="rsvpRows.length" class="meeting-rsvp-list">
               <li v-for="o in rsvpRows" :key="o.url" class="meeting-rsvp-row">
-                <graffiti-actor-to-handle :actor="o.actor"></graffiti-actor-to-handle>
+                <graffiti-actor-to-handle
+                  :actor="o.actor"
+                ></graffiti-actor-to-handle>
                 <span
                   class="rsvp-tag"
                   :class="
