@@ -9,6 +9,8 @@ import {
   meetingObjectSchema,
   meetingTimeMs,
   chatFeedObjectSchema,
+  rsvpObjectSchema,
+  MEETING_RSVP_ACTIVITY,
 } from "../meeting/shared-schemas.js";
 
 const UUID_RE =
@@ -275,6 +277,51 @@ function setup() {
 
   provide("allMeetingsDisplay", allMeetingsDisplay);
   provide("areAllMeetingsLoading", areAllMeetingsLoading);
+
+  const { objects: allTeamsRsvpObjects } = useGraffitiDiscover(
+    () => mergedTeams.value.map((t) => t.channel),
+    rsvpObjectSchema,
+    session,
+    true,
+  );
+
+  function latestOwnRsvp(meetingId) {
+    const actor = session.value?.actor;
+    if (!actor) return null;
+    let best = null;
+    for (const o of allTeamsRsvpObjects.value) {
+      if (o.value.meetingId !== meetingId || o.actor !== actor) continue;
+      if (!best || o.value.published > best.value.published) best = o;
+    }
+    return best;
+  }
+
+  const homeMeetingRsvpBusy = ref(new Set());
+  async function submitHomeMeetingRsvp(meetingId, response, teamChannel) {
+    if (!teamChannel || !session.value) return;
+    const key = `${meetingId}:${response}`;
+    homeMeetingRsvpBusy.value.add(key);
+    try {
+      await graffiti.post(
+        {
+          value: {
+            activity: MEETING_RSVP_ACTIVITY,
+            meetingId,
+            response,
+            published: Date.now(),
+          },
+          channels: [teamChannel],
+        },
+        session.value,
+      );
+    } finally {
+      homeMeetingRsvpBusy.value.delete(key);
+    }
+  }
+
+  provide("homeLatestOwnRsvp", latestOwnRsvp);
+  provide("submitHomeMeetingRsvp", submitHomeMeetingRsvp);
+  provide("homeMeetingRsvpBusy", homeMeetingRsvpBusy);
 
   const teamCode = ref("");
   const isJoining = ref(false);

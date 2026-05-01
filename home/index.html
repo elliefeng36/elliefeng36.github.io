@@ -50,6 +50,30 @@
                   >{{ row.teamTitle }}</router-link
                 >
               </div>
+              <div
+                v-if="row.object.value.meetingId"
+                class="rsvp-row home-meeting-rsvp"
+              >
+                <rsvp-buttons
+                  compact
+                  :your-response="
+                    homeLatestOwnRsvp(row.object.value.meetingId)?.value.response ??
+                    null
+                  "
+                  :busy-yes="
+                    homeMeetingRsvpBusy.has(row.object.value.meetingId + ':yes')
+                  "
+                  :busy-no="
+                    homeMeetingRsvpBusy.has(row.object.value.meetingId + ':no')
+                  "
+                  @yes="
+                    submitHomeMeetingRsvp(row.object.value.meetingId, 'yes', row.teamChannel)
+                  "
+                  @no="
+                    submitHomeMeetingRsvp(row.object.value.meetingId, 'no', row.teamChannel)
+                  "
+                />
+              </div>
             </li>
           </ul>
           <p v-else class="muted">No meetings yet.</p>
