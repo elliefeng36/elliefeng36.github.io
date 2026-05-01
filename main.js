@@ -7,6 +7,27 @@ import HomeView from "./home/home-view.js";
 import ChatView from "./chat/index.js";
 import MeetingView from "./meeting/index.js";
 
+/** Append `<template id="...">` from a small HTML document (same origin). */
+async function appendTemplateFromHtml(url, templateId) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to load ${url}: ${res.status}`);
+  }
+  const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  const el = doc.getElementById(templateId);
+  if (!el || el.tagName !== "TEMPLATE") {
+    throw new Error(`Expected <template id="${templateId}"> in ${url}`);
+  }
+  document.body.appendChild(el);
+}
+
+await Promise.all([
+  appendTemplateFromHtml("/home/index.html", "template-home"),
+  appendTemplateFromHtml("/chat/index.html", "template-chat"),
+  appendTemplateFromHtml("/meeting/index.html", "template-meeting"),
+  appendTemplateFromHtml("/components/rsvp.html", "template-rsvp-buttons"),
+]);
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [

@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chappystick — chat template</title>
+  </head>
+  <body>
+    <template id="template-chat">
+      <div class="chat-route">
+        <header class="main-header main-header--chat">
+          <div class="chat-header-info">
+            <h2 class="main-title">{{ currentTeamTitle }}</h2>
+            <p class="main-sub join-code-row">
+              <span class="join-code-label">Join code</span>
+              <code class="inline-code join-code-value">{{ channel }}</code>
+              <button
+                type="button"
+                class="btn btn-ghost btn-copy-code"
+                @click="copyTeamCode"
+                :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
+              >
+                {{ teamCodeJustCopied ? "Copied" : "Copy" }}
+              </button>
+            </p>
+          </div>
+          <section class="meetings-panel meetings-panel--header">
+            <div class="panel-head">
+              <h3 class="panel-title">Upcoming</h3>
+            </div>
+            <div class="meetings-list-wrap meetings-list-wrap--top">
+              <p
+                v-if="areMeetingObjectsLoading && !sortedMeetingObjects.length"
+                class="muted loading-line"
+              >
+                Loading meetings…
+              </p>
+              <ul v-if="sortedMeetingObjects.length" class="meetings-list">
+                <li
+                  v-for="object of sortedMeetingObjects"
+                  :key="object.url"
+                  class="meeting-card"
+                  :class="{ 'meeting-card--past': isMeetingPast(object) }"
+                >
+                  <div class="meeting-card-head">
+                    <div class="meeting-bar-lead">
+                      <div class="meeting-name-row">
+                        <span class="meeting-name">
+                          <router-link
+                            v-if="object.value.meetingId"
+                            class="meeting-title-link"
+                            :to="{
+                              name: 'meeting',
+                              params: { meetingID: object.value.meetingId },
+                            }"
+                            >{{ object.value.name }}</router-link
+                          >
+                          <template v-else>{{ object.value.name }}</template>
+                        </span>
+                        <span
+                          v-if="isMeetingPast(object)"
+                          class="meeting-pill meeting-pill-past"
+                          >Past</span
+                        >
+                      </div>
+                      <div
+                        v-if="object.value.meetingId"
+                        class="rsvp-row rsvp-row--meeting-bar"
+                      >
+                        <rsvp-buttons
+                          compact
+                          :your-response="
+                            latestOwnRsvp(object.value.meetingId)?.value.response ??
+                            null
+                          "
+                          :busy-yes="rsvpBusy.has(object.value.meetingId + ':yes')"
+                          :busy-no="rsvpBusy.has(object.value.meetingId + ':no')"
+                          @yes="submitRsvp(object.value.meetingId, 'yes')"
+                          @no="submitRsvp(object.value.meetingId, 'no')"
+                        />
+                      </div>
+                    </div>
+                    <span class="meeting-when"
+                      >{{ new Date( object.value.startsAt ?? object.value.date ??
+                      object.value.published, ).toLocaleString(undefined, {
+                      dateStyle: "medium", timeStyle: "short", }) }}</span
+                    >
+                  </div>
+                  <div class="meeting-loc" v-if="object.value.location != null">
+                    <span class="meeting-loc-label">Where</span>
+                    <span class="meeting-loc-text"
+                      >{{ object.value.location }}</span
+                    >
+                  </div>
+                </li>
+              </ul>
+              <p
+                v-else-if="!areMeetingObjectsLoading"
+                class="muted"
+              >
+                No meetings yet.
+              </p>
+            </div>
+          </section>
+        </header>
+
+        <section class="messages-panel">
+          <p v-if="areMessageObjectsLoading" class="muted messages-status">
+            Loading messages…
+          </p>
+          <ul class="messages-list">
+            <li
+              v-for="object of sortedFeedObjects"
+              :key="object.url"
+              class="message-row"
+              :class="{ 'message-row--announcement': isAnnouncementObject(object) }"
+            >
+              <div
+                v-if="isAnnouncementObject(object)"
+                class="message-bubble message-bubble--announcement"
+              >
+                <p class="announcement-title">
+                  <span class="announcement-badge">Meeting</span>
+                  New:
+                  <router-link
+                    class="announcement-meeting-link"
+                    :to="{
+                      name: 'meeting',
+                      params: { meetingID: object.value.meetingId },
+                    }"
+                    >{{ object.value.name }}</router-link
+                  >
+                </p>
+                <p class="announcement-detail muted">
+                  {{ new Date(object.value.startsAt).toLocaleString(undefined, {
+                  dateStyle: "medium", timeStyle: "short", }) }} · {{
+                  object.value.location }}
+                </p>
+                <div class="rsvp-row">
+                  <rsvp-buttons
+                    :your-response="
+                      latestOwnRsvp(object.value.meetingId)?.value.response ??
+                      null
+                    "
+                    :busy-yes="rsvpBusy.has(object.value.meetingId + ':yes')"
+                    :busy-no="rsvpBusy.has(object.value.meetingId + ':no')"
+                    @yes="submitRsvp(object.value.meetingId, 'yes')"
+                    @no="submitRsvp(object.value.meetingId, 'no')"
+                  />
+                  <button
+                    v-if="object.actor === $graffitiSession.value?.actor"
+                    type="button"
+                    class="btn-icon"
+                    @click="deleteMessage(object)"
+                    :disabled="isDeleting.has(object.url)"
+                    title="Delete announcement"
+                  >
+                    {{ isDeleting.has(object.url) ? "…" : "✕" }}
+                  </button>
+                </div>
+              </div>
+              <div v-else class="message-bubble">
+                <div class="message-meta">
+                  <strong class="message-author">
+                    <actor-display :actor="object.actor" />
+                  </strong>
+                  <button
+                    v-if="object.actor === $graffitiSession.value?.actor"
+                    type="button"
+                    class="btn-icon"
+                    @click="deleteMessage(object)"
+                    :disabled="isDeleting.has(object.url)"
+                    title="Delete"
+                  >
+                    {{ isDeleting.has(object.url) ? "…" : "✕" }}
+                  </button>
+                </div>
+                <p class="message-body">{{ object.value.content }}</p>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <footer class="composer">
+          <div class="composer-bar">
+            <button
+              type="button"
+              class="btn btn-secondary composer-schedule"
+              @click="openScheduleMeeting()"
+            >
+              Schedule meeting
+            </button>
+            <form class="composer-form" @submit.prevent="sendMessage()">
+              <input
+                class="input composer-input"
+                type="text"
+                v-model="myMessage"
+                placeholder="Write a message…"
+                autocomplete="off"
+              />
+              <button
+                type="submit"
+                class="btn btn-primary composer-send"
+                :disabled="!myMessage || isSending"
+              >
+                {{ isSending ? "…" : "Send" }}
+              </button>
+            </form>
+          </div>
+        </footer>
+
+        <teleport to="body">
+          <div
+            v-if="scheduleMeetingOpen"
+            class="modal-backdrop"
+            @click.self="closeScheduleMeeting()"
+          >
+            <div
+              class="modal-dialog schedule-meeting-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="schedule-meeting-title"
+              @click.stop
+            >
+              <h2 id="schedule-meeting-title" class="modal-title">
+                Schedule a meeting
+              </h2>
+              <form
+                class="meeting-form meeting-form--modal"
+                @submit.prevent="schedMeeting()"
+              >
+                <input
+                  class="input meeting-form-name"
+                  type="text"
+                  v-model="meetingName"
+                  placeholder="Meeting name"
+                  autocomplete="off"
+                />
+                <input
+                  class="input"
+                  type="datetime-local"
+                  v-model="meetingDateTime"
+                  title="Date and time"
+                />
+                <input
+                  class="input"
+                  type="text"
+                  v-model="meetingLocation"
+                  placeholder="Location"
+                  autocomplete="off"
+                />
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn btn-ghost"
+                    :disabled="isScheduling"
+                    @click="closeScheduleMeeting()"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="btn btn-primary"
+                    :disabled="
+                      !meetingName.trim() || !meetingDateTime || isScheduling
+                    "
+                  >
+                    {{ isScheduling ? "Scheduling…" : "Add meeting" }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </teleport>
+      </div>
+    </template>
+  </body>
+</html>

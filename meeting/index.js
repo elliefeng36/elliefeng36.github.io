@@ -1,4 +1,4 @@
-import { computed, inject, watch } from "vue";
+import { computed, inject, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   useGraffiti,
@@ -11,6 +11,8 @@ import {
   meetingTimeMs,
   MEETING_RSVP_ACTIVITY,
 } from "./shared-schemas.js";
+import RsvpButtons from "../components/rsvp.js";
+import ActorDisplay from "../components/actor-display.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -102,22 +104,36 @@ function setup() {
     return !meetingObject.value;
   });
 
+  const ownRsvpResponse = computed(() => {
+    const actor = session.value?.actor;
+    if (!actor) return null;
+    const mine = rsvpRows.value.find((o) => o.actor === actor);
+    return mine?.value.response ?? null;
+  });
+
+  const rsvpSubmitting = ref(null);
+
   async function postRsvp(response) {
     const id = meetingIdParam.value;
     const ch = meetingChannel.value;
     if (!meetingObject.value || !id || !ch || !session.value) return;
-    await graffiti.post(
-      {
-        value: {
-          activity: MEETING_RSVP_ACTIVITY,
-          meetingId: id,
-          response,
-          published: Date.now(),
+    rsvpSubmitting.value = response;
+    try {
+      await graffiti.post(
+        {
+          value: {
+            activity: MEETING_RSVP_ACTIVITY,
+            meetingId: id,
+            response,
+            published: Date.now(),
+          },
+          channels: [ch],
         },
-        channels: [ch],
-      },
-      session.value,
-    );
+        session.value,
+      );
+    } finally {
+      rsvpSubmitting.value = null;
+    }
   }
 
   return {
@@ -133,10 +149,13 @@ function setup() {
     meetingChannel,
     notFound,
     postRsvp,
+    ownRsvpResponse,
+    rsvpSubmitting,
   };
 }
 
 export default {
   template: "#template-meeting",
+  components: { RsvpButtons, ActorDisplay },
   setup,
 };

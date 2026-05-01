@@ -283,6 +283,156 @@ body {
   box-shadow: inset 0 -1px 0 rgba(245, 154, 106, 0.18);
 }
 
+.main-header--chat {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+}
+
+.chat-header-info {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(100%, 22rem);
+}
+
+/* Upcoming meetings — fills remaining header width (or full row when wrapped), short strip */
+.meetings-panel--header {
+  flex: 1 1 12rem;
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  max-height: 5.75rem;
+  padding: 0.22rem 0.45rem 0.26rem;
+}
+
+.meetings-panel--header .panel-head {
+  margin-bottom: 0.1rem;
+}
+
+.meetings-panel--header .panel-title {
+  font-size: 0.58rem;
+}
+
+.meetings-panel--header .meetings-list {
+  max-height: 3.5rem;
+  overflow-y: auto;
+}
+
+.meetings-panel--header .meeting-card {
+  padding: 0.08rem 0;
+  font-size: 0.78rem;
+}
+
+.meetings-panel--header .meeting-card-head {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+/* Name + RSVP (compact) on the left; time stays at the end of the row */
+.meetings-panel--header .meeting-bar-lead {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.28rem 0.4rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.meetings-panel--header .meeting-name-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.meetings-panel--header .meeting-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.92rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.meetings-panel--header .meeting-title-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.meetings-panel--header .meeting-when {
+  font-size: 0.7rem;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.meetings-panel--header .meeting-loc {
+  display: none;
+}
+
+.meetings-panel--header .meeting-pill {
+  font-size: 0.5rem;
+  padding: 0.06rem 0.22rem;
+}
+
+.meetings-panel--header .rsvp-row--meeting-bar {
+  margin-top: 0;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  gap: 0.2rem 0.3rem;
+}
+
+.meetings-panel--header .rsvp-row--meeting-bar .btn-sm {
+  font-size: 0.62rem;
+  padding: 0.12rem 0.34rem;
+  min-height: 0;
+  line-height: 1.2;
+}
+
+.meetings-panel--header .loading-line,
+.meetings-panel--header .muted {
+  font-size: 0.72rem;
+  margin: 0.08rem 0 0;
+  line-height: 1.25;
+}
+
+@media (max-width: 720px) {
+  .main-header--chat {
+    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .chat-header-info {
+    max-width: none;
+  }
+
+  .meetings-panel--header {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-height: 5.5rem;
+  }
+
+  .meetings-panel--header .meetings-list {
+    max-height: 3.35rem;
+  }
+}
+
 .main-title {
   margin: 0;
   font-size: 1.35rem;
@@ -454,6 +604,12 @@ body {
   border-top: 1px solid var(--border-soft);
 }
 
+.meetings-list-wrap--top {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
 .meetings-list {
   list-style: none;
   margin: 0;
@@ -610,6 +766,24 @@ body {
   color: var(--warm-bright);
 }
 
+/* Hidden resolver for actor-display (still in DOM for Graffiti handle resolution) */
+.actor-display {
+  position: relative;
+  display: inline;
+}
+
+.actor-display-probe {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .message-body {
   margin: 0;
   white-space: pre-wrap;
@@ -632,11 +806,51 @@ body {
   box-shadow: 0 -6px 24px rgba(232, 109, 71, 0.06);
 }
 
-.composer-form {
+.composer-bar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.55rem;
   align-items: stretch;
   max-width: 56rem;
+}
+
+.composer-schedule {
+  flex-shrink: 0;
+  padding-inline: 0.75rem;
+  font-size: 0.84rem;
+  white-space: nowrap;
+  color: var(--text);
+  background: linear-gradient(
+      180deg,
+      rgba(245, 154, 106, 0.2) 0%,
+      rgba(232, 109, 71, 0.08) 100%
+    ),
+    var(--bg-elevated);
+  border-color: rgba(245, 154, 106, 0.38);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 170, 0.14),
+    0 1px 8px rgba(232, 109, 71, 0.1);
+}
+
+.composer-schedule:hover:not(:disabled) {
+  border-color: rgba(245, 154, 106, 0.52);
+  background: linear-gradient(
+      180deg,
+      rgba(245, 154, 106, 0.3) 0%,
+      rgba(232, 109, 71, 0.14) 100%
+    ),
+    #3a4a5e;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 210, 180, 0.18),
+    0 2px 12px rgba(232, 109, 71, 0.14);
+}
+
+.composer-form {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 0.55rem;
+  align-items: stretch;
 }
 
 .composer-input {
@@ -647,6 +861,64 @@ body {
 .composer-send {
   flex-shrink: 0;
   min-width: 5.5rem;
+}
+
+/* —— Modal (schedule meeting) —— */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(10, 14, 22, 0.75);
+  backdrop-filter: blur(5px);
+}
+
+.modal-dialog {
+  width: 100%;
+  max-width: 24rem;
+  padding: 1.15rem 1.25rem 1.2rem;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(245, 154, 106, 0.1) 0%,
+      transparent 55%
+    ),
+    var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow), 0 0 0 1px rgba(245, 154, 106, 0.12);
+}
+
+.modal-title {
+  margin: 0 0 0.9rem;
+  font-size: 1.08rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.meeting-form.meeting-form--modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.schedule-meeting-dialog .input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  padding-top: 0.35rem;
 }
 
 /* —— Team nav —— */
@@ -806,6 +1078,10 @@ body {
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn.rsvp-btn:disabled {
+  cursor: default;
 }
 
 .btn-block {
@@ -1021,6 +1297,30 @@ body {
 .rsvp-your {
   font-size: 0.8rem;
   margin-right: 0.25rem;
+}
+
+/* RSVP: subtle warm tint on the option you chose (quieter than primary orange) */
+.rsvp-row .btn.rsvp-btn--selected {
+  color: var(--text);
+  background: linear-gradient(
+      180deg,
+      rgba(245, 154, 106, 0.2) 0%,
+      rgba(232, 109, 71, 0.1) 100%
+    ),
+    var(--bg-elevated);
+  border-color: rgba(245, 154, 106, 0.28);
+  box-shadow: 0 1px 6px rgba(232, 109, 71, 0.12);
+}
+
+.rsvp-row .btn.rsvp-btn--selected:hover:not(:disabled) {
+  background: linear-gradient(
+      180deg,
+      rgba(245, 154, 106, 0.28) 0%,
+      rgba(232, 109, 71, 0.16) 100%
+    ),
+    #3a4a5e;
+  border-color: rgba(245, 154, 106, 0.38);
+  box-shadow: 0 1px 10px rgba(232, 109, 71, 0.16);
 }
 
 .btn-sm {

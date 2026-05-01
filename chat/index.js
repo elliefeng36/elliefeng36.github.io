@@ -1,4 +1,4 @@
-import { ref, computed, watch, inject } from "vue";
+import { ref, computed, watch, inject, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   useGraffiti,
@@ -14,6 +14,8 @@ import {
   MEETING_ANNOUNCEMENT_ACTIVITY,
   MEETING_RSVP_ACTIVITY,
 } from "../meeting/shared-schemas.js";
+import RsvpButtons from "../components/rsvp.js";
+import ActorDisplay from "../components/actor-display.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -166,6 +168,35 @@ function setup() {
     }
   }
 
+  const scheduleMeetingOpen = ref(false);
+
+  function openScheduleMeeting() {
+    if (channel.value && !meetingDateTime.value) {
+      meetingDateTime.value = defaultMeetingDatetimeLocal();
+    }
+    scheduleMeetingOpen.value = true;
+  }
+
+  function closeScheduleMeeting() {
+    scheduleMeetingOpen.value = false;
+  }
+
+  function onScheduleModalEscape(e) {
+    if (e.key === "Escape") closeScheduleMeeting();
+  }
+
+  watch(scheduleMeetingOpen, (open) => {
+    if (open) {
+      document.addEventListener("keydown", onScheduleModalEscape);
+    } else {
+      document.removeEventListener("keydown", onScheduleModalEscape);
+    }
+  });
+
+  onUnmounted(() => {
+    document.removeEventListener("keydown", onScheduleModalEscape);
+  });
+
   async function schedMeeting() {
     if (!channel.value || !meetingDateTime.value) return;
     isScheduling.value = true;
@@ -206,6 +237,7 @@ function setup() {
       meetingName.value = "";
       meetingDateTime.value = defaultMeetingDatetimeLocal();
       meetingLocation.value = "";
+      closeScheduleMeeting();
     } finally {
       isScheduling.value = false;
     }
@@ -240,6 +272,7 @@ function setup() {
       meetingDateTime.value = defaultMeetingDatetimeLocal();
     } else {
       meetingDateTime.value = "";
+      closeScheduleMeeting();
     }
   });
 
@@ -268,10 +301,14 @@ function setup() {
     latestOwnRsvp,
     submitRsvp,
     rsvpBusy,
+    scheduleMeetingOpen,
+    openScheduleMeeting,
+    closeScheduleMeeting,
   };
 }
 
 export default {
   template: "#template-chat",
+  components: { RsvpButtons, ActorDisplay },
   setup,
 };

@@ -8,6 +8,7 @@ import {
 import {
   meetingObjectSchema,
   meetingTimeMs,
+  chatFeedObjectSchema,
 } from "../meeting/shared-schemas.js";
 
 const UUID_RE =
@@ -95,7 +96,7 @@ function setup() {
     },
   };
 
-  const { objects: chats } = useGraffitiDiscover(
+  const { objects: chats, isFirstPoll: chatsFirstPoll } = useGraffitiDiscover(
     [DIRECTORY_CHANNEL],
     chatDirectorySchema,
     session,
@@ -117,12 +118,13 @@ function setup() {
     },
   };
 
-  const { objects: joinedBookmarks } = useGraffitiDiscover(
-    [DIRECTORY_CHANNEL],
-    joinBookmarkSchema,
-    session,
-    true,
-  );
+  const { objects: joinedBookmarks, isFirstPoll: bookmarksFirstPoll } =
+    useGraffitiDiscover(
+      [DIRECTORY_CHANNEL],
+      joinBookmarkSchema,
+      session,
+      true,
+    );
 
   const bookmarkChannelIds = computed(() => [
     ...new Set(joinedBookmarks.value.map((o) => o.value.channel)),
@@ -147,6 +149,40 @@ function setup() {
     teamMetaSchema,
     session,
     true,
+  );
+
+  /** All team channel ids (created or bookmarked) for feed activity. */
+  const teamChannelsForActivity = computed(() => {
+    const ids = new Set();
+    for (const o of chats.value) ids.add(o.value.channel);
+    for (const o of joinedBookmarks.value) ids.add(o.value.channel);
+    return [...ids];
+  });
+
+  const { objects: teamFeedObjects } = useGraffitiDiscover(
+    () => teamChannelsForActivity.value,
+    chatFeedObjectSchema,
+    session,
+    true,
+  );
+
+  /** Latest message `published` time per team channel (chat + announcements). */
+  const lastMessageTimeByChannel = computed(() => {
+    const m = new Map();
+    for (const o of teamFeedObjects.value) {
+      const ch = o.channels?.[0];
+      if (!ch) continue;
+      const t = o.value?.published;
+      if (typeof t !== "number") continue;
+      const prev = m.get(ch) ?? 0;
+      if (t > prev) m.set(ch, t);
+    }
+    return m;
+  });
+
+  /** True while the directory / join-bookmark discovers have not finished their first poll yet. */
+  const teamsListLoading = computed(
+    () => chatsFirstPoll.value || bookmarksFirstPoll.value,
   );
 
   const mergedTeams = computed(() => {
@@ -184,7 +220,29 @@ function setup() {
         });
       }
     }
-    return [...byChannel.values()];
+
+    const lastMsg = lastMessageTimeByChannel.value;
+
+    const rows = [...byChannel.values()].map((row) => {
+      const ch = row.channel;
+      let joinOrCreateTs = 0;
+      for (const o of joinedBookmarks.value) {
+        if (o.value.channel === ch) {
+          joinOrCreateTs = Math.max(joinOrCreateTs, o.value.published);
+        }
+      }
+      for (const o of chats.value) {
+        if (o.value.channel === ch) {
+          joinOrCreateTs = Math.max(joinOrCreateTs, o.value.published);
+        }
+      }
+      const msgTs = lastMsg.get(ch) ?? 0;
+      const sortKey = Math.max(joinOrCreateTs, msgTs);
+      return { ...row, sortKey };
+    });
+
+    rows.sort((a, b) => b.sortKey - a.sortKey);
+    return rows.map(({ sortKey, ...rest }) => rest);
   });
 
   provide("mergedTeams", mergedTeams);
@@ -359,6 +417,7 @@ function setup() {
   return {
     newChat,
     mergedTeams,
+    teamsListLoading,
     activeChatId,
     newChatName,
     isCreating,

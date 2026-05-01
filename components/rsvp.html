@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chappystick — RSVP buttons</title>
+  </head>
+  <body>
+    <template id="template-rsvp-buttons">
+      <button
+        type="button"
+        class="btn btn-secondary btn-sm rsvp-btn"
+        :class="{ 'rsvp-btn--selected': yourResponse === 'yes' }"
+        :disabled="busyYes"
+        @click="$emit('yes')"
+      >
+        {{ compact ? "Yes" : "RSVP yes" }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm rsvp-btn"
+        :class="{ 'rsvp-btn--selected': yourResponse === 'no' }"
+        :disabled="busyNo"
+        @click="$emit('no')"
+      >
+        {{ compact ? "No" : "RSVP no" }}
+      </button>
+    </template>
+  </body>
+</html>

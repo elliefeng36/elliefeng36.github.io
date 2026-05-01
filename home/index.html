@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chappystick — home template</title>
+  </head>
+  <body>
+    <template id="template-home">
+      <div class="home-view">
+        <section class="home-meetings">
+          <div class="panel-head">
+            <h3 class="panel-title">Your meetings</h3>
+            <p class="panel-sub">Across every team you belong to</p>
+          </div>
+          <p v-if="areAllMeetingsLoading" class="muted loading-line">
+            Loading meetings…
+          </p>
+          <ul v-else-if="allMeetingsDisplay.length" class="home-meetings-list">
+            <li
+              v-for="row in allMeetingsDisplay"
+              :key="row.object.url"
+              class="home-meeting-row"
+            >
+              <div class="home-meeting-main">
+                <router-link
+                  v-if="row.object.value.meetingId"
+                  class="home-meeting-title-link"
+                  :to="{
+                    name: 'meeting',
+                    params: { meetingID: row.object.value.meetingId },
+                  }"
+                >
+                  {{ row.object.value.name }}
+                </router-link>
+                <span v-else class="home-meeting-title"
+                  >{{ row.object.value.name }}</span
+                >
+                <span class="home-meeting-when"
+                  >{{ new Date( row.object.value.startsAt ??
+                  row.object.value.date ?? row.object.value.published,
+                  ).toLocaleString(undefined, { dateStyle: "medium", timeStyle:
+                  "short", }) }}</span
+                >
+              </div>
+              <div class="home-meeting-meta">
+                <router-link
+                  class="home-meeting-team-link"
+                  :to="{ name: 'chat', params: { chatID: row.teamChannel } }"
+                  >{{ row.teamTitle }}</router-link
+                >
+              </div>
+            </li>
+          </ul>
+          <p v-else class="muted">No meetings yet.</p>
+        </section>
+
+        <div class="main-empty">
+          <p class="main-empty-title">No chat open</p>
+          <p class="main-empty-text">
+            Pick a team in the sidebar or open
+            <code class="inline-code">/chat/&lt;team-id&gt;</code>.
+          </p>
+        </div>
+      </div>
+    </template>
+  </body>
+</html>

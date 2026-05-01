@@ -97,7 +97,10 @@
               <div class="field-label row-between">
                 <span>Your teams</span>
               </div>
-              <p v-if="!mergedTeams.length" class="sidebar-empty">
+              <p v-if="teamsListLoading" class="sidebar-empty">
+                Loading your teams…
+              </p>
+              <p v-else-if="!mergedTeams.length" class="sidebar-empty">
                 No teams yet. Create one or paste a join code.
               </p>
               <nav class="team-nav" v-else>
@@ -265,9 +268,7 @@
               <div class="message-bubble">
                 <div class="message-meta">
                   <strong class="message-author">
-                    <graffiti-actor-to-handle
-                      :actor="object.actor"
-                    ></graffiti-actor-to-handle>
+                    <actor-display :actor="object.actor" />
                   </strong>
                   <button
                     v-if="object.actor === $graffitiSession.value?.actor"

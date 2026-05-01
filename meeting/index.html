@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chappystick — meeting template</title>
+  </head>
+  <body>
+    <template id="template-meeting">
+      <div class="meeting-page">
+        <p v-if="meetingsLoading" class="muted loading-line">Loading…</p>
+        <div v-else-if="notFound" class="main-empty">
+          <p class="main-empty-title">Meeting not found</p>
+          <p class="main-empty-text">
+            It may have been removed or you may not have access to that team.
+          </p>
+          <router-link class="btn btn-secondary" to="/">Home</router-link>
+        </div>
+        <template v-else-if="meetingObject">
+          <header class="main-header meeting-page-header">
+            <router-link class="btn btn-ghost btn-back" to="/"
+              >← Home</router-link
+            >
+            <router-link
+              v-if="meetingChannel"
+              class="btn btn-ghost btn-back"
+              :to="{ name: 'chat', params: { chatID: meetingChannel } }"
+              >Team chat</router-link
+            >
+          </header>
+          <div class="meeting-page-body">
+            <h2 class="meeting-page-title">{{ meetingObject.value.name }}</h2>
+            <p class="meeting-page-team muted">Team: {{ teamTitle }}</p>
+            <dl class="meeting-page-dl">
+              <dt>When</dt>
+              <dd>
+                {{ new Date( meetingObject.value.startsAt ??
+                meetingObject.value.date ?? meetingObject.value.published,
+                ).toLocaleString(undefined, { dateStyle: "full", timeStyle:
+                "short", }) }}
+              </dd>
+              <dt>Where</dt>
+              <dd>{{ meetingObject.value.location }}</dd>
+            </dl>
+            <div class="meeting-page-rsvp-summary">
+              <span class="rsvp-pill rsvp-pill-yes">{{ yesCount }} yes</span>
+              <span class="rsvp-pill rsvp-pill-no">{{ noCount }} no</span>
+            </div>
+            <div class="rsvp-row meeting-page-rsvp-actions">
+              <rsvp-buttons
+                :your-response="ownRsvpResponse"
+                :busy-yes="rsvpSubmitting === 'yes'"
+                :busy-no="rsvpSubmitting === 'no'"
+                @yes="postRsvp('yes')"
+                @no="postRsvp('no')"
+              />
+            </div>
+            <h3 class="meeting-rsvp-heading">Who responded</h3>
+            <p v-if="rsvpsLoading && !rsvpRows.length" class="muted">
+              Loading…
+            </p>
+            <ul v-else-if="rsvpRows.length" class="meeting-rsvp-list">
+              <li v-for="o in rsvpRows" :key="o.url" class="meeting-rsvp-row">
+                <actor-display :actor="o.actor" />
+                <span
+                  class="rsvp-tag"
+                  :class="
+                    o.value.response === 'yes' ? 'rsvp-tag-yes' : 'rsvp-tag-no'
+                  "
+                  >{{ o.value.response }}</span
+                >
+              </li>
+            </ul>
+            <p v-else class="muted">No RSVPs yet.</p>
+          </div>
+        </template>
+      </div>
+    </template>
+  </body>
+</html>
