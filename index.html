@@ -20,7 +20,12 @@
   </head>
   <body>
     <div id="app">
-      <div class="app-boot" role="status" aria-live="polite" aria-label="Loading">
+      <div
+        class="app-boot"
+        role="status"
+        aria-live="polite"
+        aria-label="Loading"
+      >
         <div class="app-boot__throbber" aria-hidden="true">
           <span class="app-boot__bar"></span>
           <span class="app-boot__bar"></span>
@@ -159,7 +164,7 @@
                 class="btn btn-ghost btn-block"
                 @click="$graffiti.logout($graffitiSession.value)"
               >
-                Log out
+                Log Out
               </button>
             </div>
           </aside>
@@ -181,7 +186,9 @@
                 aria-labelledby="edit-meeting-title"
                 @click.stop
               >
-                <h2 id="edit-meeting-title" class="modal-title">Edit meeting</h2>
+                <h2 id="edit-meeting-title" class="modal-title">
+                  Edit meeting
+                </h2>
                 <form
                   class="meeting-form meeting-form--modal"
                   @submit.prevent="saveEditedMeeting()"
@@ -219,15 +226,8 @@
                       :key="m"
                       :value="m"
                     >
-                      {{
-                        m === 60
-                          ? "1 hr"
-                          : m === 120
-                            ? "2 hr"
-                            : m === 1440
-                              ? "1 day"
-                              : `${m} min`
-                      }}
+                      {{ m === 60 ? "1 hr" : m === 120 ? "2 hr" : m === 1440 ?
+                      "1 day" : `${m} min` }}
                     </option>
                   </select>
                   <div class="modal-actions">
