@@ -29,7 +29,16 @@
             >
           </header>
           <div class="meeting-page-body">
-            <h2 class="meeting-page-title">{{ meetingObject.value.name }}</h2>
+            <div
+              class="meeting-page-title-row"
+              :class="{ 'meeting-row--editable-hover': canEditMeeting }"
+            >
+              <h2 class="meeting-page-title">{{ meetingObject.value.name }}</h2>
+              <edit-meeting-button
+                v-if="canEditMeeting"
+                :meeting-object="meetingObject"
+              />
+            </div>
             <p class="meeting-page-team muted">Team: {{ teamTitle }}</p>
             <dl class="meeting-page-dl">
               <dt>When</dt>

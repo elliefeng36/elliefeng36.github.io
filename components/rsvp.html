@@ -7,24 +7,34 @@
   </head>
   <body>
     <template id="template-rsvp-buttons">
-      <button
-        type="button"
-        class="btn btn-secondary btn-sm rsvp-btn"
-        :class="{ 'rsvp-btn--selected': yourResponse === 'yes' }"
-        :disabled="busyYes"
-        @click="$emit('yes')"
-      >
-        {{ compact ? "Yes" : "RSVP yes" }}
-      </button>
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm rsvp-btn"
-        :class="{ 'rsvp-btn--selected': yourResponse === 'no' }"
-        :disabled="busyNo"
-        @click="$emit('no')"
-      >
-        {{ compact ? "No" : "RSVP no" }}
-      </button>
+      <div class="rsvp-btn-group">
+        <button
+          type="button"
+          class="btn btn-secondary btn-sm rsvp-btn"
+          :class="{
+            'rsvp-btn--selected': yourResponse === 'yes',
+            'rsvp-btn--jump': jumpYes,
+          }"
+          :disabled="busyYes"
+          @animationend="jumpYes = false"
+          @click="onYes"
+        >
+          {{ compact ? "Yes" : "RSVP yes" }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm rsvp-btn"
+          :class="{
+            'rsvp-btn--selected': yourResponse === 'no',
+            'rsvp-btn--jump': jumpNo,
+          }"
+          :disabled="busyNo"
+          @animationend="jumpNo = false"
+          @click="onNo"
+        >
+          {{ compact ? "No" : "RSVP no" }}
+        </button>
+      </div>
     </template>
   </body>
 </html>

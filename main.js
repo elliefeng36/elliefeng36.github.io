@@ -26,6 +26,10 @@ await Promise.all([
   appendTemplateFromHtml("/chat/index.html", "template-chat"),
   appendTemplateFromHtml("/meeting/index.html", "template-meeting"),
   appendTemplateFromHtml("/components/rsvp.html", "template-rsvp-buttons"),
+  appendTemplateFromHtml(
+    "/components/edit-meeting-button/edit-meeting-button.html",
+    "template-edit-meeting-button",
+  ),
 ]);
 
 const router = createRouter({

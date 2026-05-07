@@ -13,15 +13,17 @@
             <h2 class="main-title">{{ currentTeamTitle }}</h2>
             <p class="main-sub join-code-row">
               <span class="join-code-label">Join code</span>
-              <code class="inline-code join-code-value">{{ channel }}</code>
-              <button
-                type="button"
-                class="btn btn-ghost btn-copy-code"
-                @click="copyTeamCode"
-                :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
-              >
-                {{ teamCodeJustCopied ? "Copied" : "Copy" }}
-              </button>
+              <span class="join-code-inline">
+                <code class="inline-code join-code-value">{{ channel }}</code>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-copy-code"
+                  @click="copyTeamCode"
+                  :title="teamCodeJustCopied ? 'Copied' : 'Copy team id'"
+                >
+                  {{ teamCodeJustCopied ? "Copied" : "Copy" }}
+                </button>
+              </span>
             </p>
           </div>
           <section class="meetings-panel meetings-panel--header">
@@ -40,8 +42,26 @@
                   v-for="object of sortedMeetingObjects"
                   :key="object.url"
                   class="meeting-card"
-                  :class="{ 'meeting-card--past': isMeetingPast(object) }"
+                  :class="{
+                    'meeting-card--past': isMeetingPast(object),
+                    'meeting-row--editable-hover':
+                      object.actor === $graffitiSession.value?.actor &&
+                      object.value.meetingId &&
+                      object.value.activity === CHAPSTICK_MEETING_ACTIVITY,
+                    'meeting-card--has-reminder':
+                      hasUnreadReminderNotification(channel) &&
+                      !isMeetingPast(object),
+                  }"
                 >
+                  <span
+                    v-if="
+                      hasUnreadReminderNotification(channel) &&
+                      !isMeetingPast(object)
+                    "
+                    class="meeting-notification-dot"
+                    aria-label="Unread meeting reminder"
+                    title="Unread meeting reminder"
+                  ></span>
                   <div class="meeting-card-head">
                     <div class="meeting-bar-lead">
                       <div class="meeting-name-row">
@@ -62,6 +82,10 @@
                           class="meeting-pill meeting-pill-past"
                           >Past</span
                         >
+                        <edit-meeting-button
+                          :meeting-object="object"
+                          @before-edit="closeScheduleMeeting"
+                        />
                       </div>
                       <div
                         v-if="object.value.meetingId"
@@ -118,6 +142,11 @@
               <div
                 v-if="isAnnouncementObject(object)"
                 class="message-bubble message-bubble--announcement"
+                :class="{
+                  'meeting-row--editable-hover':
+                    object.actor === $graffitiSession.value?.actor &&
+                    findMyChapMeetingForId(object.value.meetingId),
+                }"
               >
                 <p class="announcement-title">
                   <span class="announcement-badge">Meeting</span>
@@ -146,6 +175,13 @@
                     :busy-no="rsvpBusy.has(object.value.meetingId + ':no')"
                     @yes="submitRsvp(object.value.meetingId, 'yes')"
                     @no="submitRsvp(object.value.meetingId, 'no')"
+                  />
+                  <edit-meeting-button
+                    v-if="findMyChapMeetingForId(object.value.meetingId)"
+                    :meeting-object="
+                      findMyChapMeetingForId(object.value.meetingId)
+                    "
+                    @before-edit="closeScheduleMeeting"
                   />
                   <button
                     v-if="object.actor === $graffitiSession.value?.actor"
@@ -249,6 +285,30 @@
                   placeholder="Location"
                   autocomplete="off"
                 />
+                <label class="field-label" for="meeting-reminder-select"
+                  >Reminder</label
+                >
+                <select
+                  id="meeting-reminder-select"
+                  class="input"
+                  v-model.number="meetingReminderMinutes"
+                >
+                  <option
+                    v-for="m in MEETING_REMINDER_MINUTES"
+                    :key="m"
+                    :value="m"
+                  >
+                    {{
+                      m === 60
+                        ? "1 hr"
+                        : m === 120
+                          ? "2 hr"
+                          : m === 1440
+                            ? "1 day"
+                            : `${m} min`
+                    }}
+                  </option>
+                </select>
                 <div class="modal-actions">
                   <button
                     type="button"

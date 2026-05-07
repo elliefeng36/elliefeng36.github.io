@@ -19,13 +19,32 @@
     <script src="/main.js" type="module"></script>
   </head>
   <body>
-    <div id="app">Loading…</div>
+    <div id="app">
+      <div class="app-boot" role="status" aria-live="polite" aria-label="Loading">
+        <div class="app-boot__throbber" aria-hidden="true">
+          <span class="app-boot__bar"></span>
+          <span class="app-boot__bar"></span>
+          <span class="app-boot__bar"></span>
+        </div>
+      </div>
+    </div>
     <template id="template-app">
       <div class="app">
         <div v-if="$graffitiSession.value === undefined" class="auth-screen">
           <div class="auth-card">
             <h1 class="auth-title">Chappystick</h1>
-            <p class="auth-sub">Loading…</p>
+            <div
+              class="auth-sub"
+              role="status"
+              aria-live="polite"
+              aria-label="Loading"
+            >
+              <div class="app-boot__throbber" aria-hidden="true">
+                <span class="app-boot__bar"></span>
+                <span class="app-boot__bar"></span>
+                <span class="app-boot__bar"></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -115,9 +134,11 @@
                     :to="{ name: 'chat', params: { chatID: t.channel } }"
                   >
                     <span class="team-nav-title">{{ t.title }}</span>
-                    <span class="team-nav-meta"
-                      >{{ t.channel.slice(0, 8) }}…</span
-                    >
+                    <span class="team-nav-meta-row">
+                      <span class="team-nav-meta"
+                        >{{ t.channel.slice(0, 8) }}…</span
+                      >
+                    </span>
                   </router-link>
                   <button
                     type="button"
@@ -146,6 +167,94 @@
           <main class="main">
             <router-view />
           </main>
+
+          <teleport to="body">
+            <div
+              v-if="editMeetingOpen"
+              class="modal-backdrop"
+              @click.self="closeEditMeeting()"
+            >
+              <div
+                class="modal-dialog schedule-meeting-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="edit-meeting-title"
+                @click.stop
+              >
+                <h2 id="edit-meeting-title" class="modal-title">Edit meeting</h2>
+                <form
+                  class="meeting-form meeting-form--modal"
+                  @submit.prevent="saveEditedMeeting()"
+                >
+                  <input
+                    class="input meeting-form-name"
+                    type="text"
+                    v-model="editMeetingName"
+                    placeholder="Meeting name"
+                    autocomplete="off"
+                  />
+                  <input
+                    class="input"
+                    type="datetime-local"
+                    v-model="editMeetingDateTime"
+                    title="Date and time"
+                  />
+                  <input
+                    class="input"
+                    type="text"
+                    v-model="editMeetingLocation"
+                    placeholder="Location"
+                    autocomplete="off"
+                  />
+                  <label class="field-label" for="edit-meeting-reminder-select"
+                    >Reminder</label
+                  >
+                  <select
+                    id="edit-meeting-reminder-select"
+                    class="input"
+                    v-model.number="editMeetingReminderMinutes"
+                  >
+                    <option
+                      v-for="m in MEETING_REMINDER_MINUTES"
+                      :key="m"
+                      :value="m"
+                    >
+                      {{
+                        m === 60
+                          ? "1 hr"
+                          : m === 120
+                            ? "2 hr"
+                            : m === 1440
+                              ? "1 day"
+                              : `${m} min`
+                      }}
+                    </option>
+                  </select>
+                  <div class="modal-actions">
+                    <button
+                      type="button"
+                      class="btn btn-ghost"
+                      :disabled="isSavingEdit"
+                      @click="closeEditMeeting()"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      class="btn btn-primary"
+                      :disabled="
+                        !editMeetingName.trim() ||
+                        !editMeetingDateTime ||
+                        isSavingEdit
+                      "
+                    >
+                      {{ isSavingEdit ? "Saving…" : "Save changes" }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </teleport>
         </div>
       </div>
     </template>

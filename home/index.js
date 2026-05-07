@@ -1,4 +1,4 @@
-import { ref, computed, provide } from "vue";
+import { ref, computed, provide, watch, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   useGraffiti,
@@ -11,12 +11,30 @@ import {
   chatFeedObjectSchema,
   rsvpObjectSchema,
   MEETING_RSVP_ACTIVITY,
+  CHAPSTICK_MEETING_ACTIVITY,
+  MEETING_ANNOUNCEMENT_ACTIVITY,
+  MEETING_REMINDER_MINUTES,
 } from "../meeting/shared-schemas.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const DIRECTORY_CHANNEL = "chappystick-v1";
+const TEAM_REMINDER_NOTIFICATION_ACTIVITY = "MeetingReminderNotification";
+const TEAM_REMINDER_NOTIFICATION_TYPE = "TeamChatReminder";
+
+function toDatetimeLocalValue(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function reminderLabel(minutes) {
+  if (minutes === 60) return "1 hr";
+  if (minutes === 120) return "2 hr";
+  if (minutes === 1440) return "1 day";
+  return `${minutes} min`;
+}
 
 function setup() {
   const graffiti = useGraffiti();
@@ -127,6 +145,28 @@ function setup() {
       session,
       true,
     );
+
+  const teamReminderNotificationSchema = {
+    properties: {
+      value: {
+        required: ["activity", "type", "channel", "meetingId", "published"],
+        properties: {
+          activity: { const: TEAM_REMINDER_NOTIFICATION_ACTIVITY },
+          type: { const: TEAM_REMINDER_NOTIFICATION_TYPE },
+          channel: { type: "string" },
+          meetingId: { type: "string" },
+          published: { type: "number" },
+        },
+      },
+    },
+  };
+
+  const { objects: teamReminderNotifications } = useGraffitiDiscover(
+    [DIRECTORY_CHANNEL],
+    teamReminderNotificationSchema,
+    session,
+    true,
+  );
 
   const bookmarkChannelIds = computed(() => [
     ...new Set(joinedBookmarks.value.map((o) => o.value.channel)),
@@ -257,7 +297,7 @@ function setup() {
       true,
     );
 
-  const allMeetingsDisplay = computed(() => {
+  const allMeetingsRows = computed(() => {
     const rows = [];
     for (const o of allMeetingObjects.value) {
       const teamChannel = o.channels?.[0];
@@ -271,11 +311,25 @@ function setup() {
         time: meetingTimeMs(o),
       });
     }
-    rows.sort((a, b) => a.time - b.time);
     return rows;
   });
 
-  provide("allMeetingsDisplay", allMeetingsDisplay);
+  const homeMeetingsUpcoming = computed(() => {
+    const now = Date.now();
+    return allMeetingsRows.value
+      .filter((r) => r.time >= now)
+      .sort((a, b) => a.time - b.time);
+  });
+
+  const homeMeetingsPast = computed(() => {
+    const now = Date.now();
+    return allMeetingsRows.value
+      .filter((r) => r.time < now)
+      .sort((a, b) => b.time - a.time);
+  });
+
+  provide("homeMeetingsUpcoming", homeMeetingsUpcoming);
+  provide("homeMeetingsPast", homeMeetingsPast);
   provide("areAllMeetingsLoading", areAllMeetingsLoading);
 
   const { objects: allTeamsRsvpObjects } = useGraffitiDiscover(
@@ -322,6 +376,291 @@ function setup() {
   provide("homeLatestOwnRsvp", latestOwnRsvp);
   provide("submitHomeMeetingRsvp", submitHomeMeetingRsvp);
   provide("homeMeetingRsvpBusy", homeMeetingRsvpBusy);
+
+  const reminderNotificationSeenPrefix = "chapstick-reminder-seen:v1:";
+
+  function notificationSeenAt(channel) {
+    const raw = localStorage.getItem(`${reminderNotificationSeenPrefix}${channel}`);
+    const n = Number(raw ?? "0");
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  const unreadReminderCountByChannel = computed(() => {
+    const m = new Map();
+    for (const o of teamReminderNotifications.value) {
+      const ch = o.value?.channel;
+      const published = o.value?.published;
+      if (!ch || typeof published !== "number") continue;
+      if (published <= notificationSeenAt(ch)) continue;
+      m.set(ch, (m.get(ch) ?? 0) + 1);
+    }
+    return m;
+  });
+
+  function hasUnreadReminderNotification(channel) {
+    return (unreadReminderCountByChannel.value.get(channel) ?? 0) > 0;
+  }
+
+  provide("hasUnreadReminderNotification", hasUnreadReminderNotification);
+
+  const editMeetingOpen = ref(false);
+  const editingMeetingObject = ref(null);
+  const isSavingEdit = ref(false);
+  const editMeetingName = ref("");
+  const editMeetingDateTime = ref("");
+  const editMeetingLocation = ref("");
+  const editMeetingReminderMinutes = ref(10);
+
+  function isMeetingAnnouncementObject(o) {
+    return o.value?.activity === MEETING_ANNOUNCEMENT_ACTIVITY;
+  }
+
+  function closeEditMeeting() {
+    editMeetingOpen.value = false;
+    editingMeetingObject.value = null;
+  }
+
+  function openEditMeeting(object) {
+    if (!object?.value?.meetingId || !session.value) return;
+    if (object.actor !== session.value.actor) return;
+    if (object.value.activity !== CHAPSTICK_MEETING_ACTIVITY) return;
+    editingMeetingObject.value = object;
+    editMeetingName.value = object.value.name ?? "";
+    editMeetingDateTime.value = toDatetimeLocalValue(meetingTimeMs(object));
+    editMeetingLocation.value =
+      object.value.location && object.value.location !== "—"
+        ? object.value.location
+        : "";
+    editMeetingReminderMinutes.value =
+      MEETING_REMINDER_MINUTES.includes(object.value.reminderMinutes)
+        ? object.value.reminderMinutes
+        : 10;
+    editMeetingOpen.value = true;
+  }
+
+  async function saveEditedMeeting() {
+    const obj = editingMeetingObject.value;
+    if (!session.value || !obj?.value?.meetingId) return;
+    const teamChannel = obj.channels?.[0];
+    if (!teamChannel) return;
+    if (!editMeetingName.value.trim() || !editMeetingDateTime.value) return;
+    const meetingId = obj.value.meetingId;
+    isSavingEdit.value = true;
+    const name = editMeetingName.value.trim();
+    const startsAt = new Date(editMeetingDateTime.value).getTime();
+    const location = editMeetingLocation.value.trim() || "—";
+    const reminderMinutes = Number(editMeetingReminderMinutes.value);
+    const published = Date.now();
+    try {
+      const announcements = teamFeedObjects.value.filter(
+        (o) =>
+          o.channels?.[0] === teamChannel &&
+          isMeetingAnnouncementObject(o) &&
+          o.value.meetingId === meetingId &&
+          o.actor === session.value.actor,
+      );
+      for (const a of announcements) {
+        await graffiti.delete(a, session.value);
+      }
+      await graffiti.delete(obj, session.value);
+      await graffiti.post(
+        {
+          value: {
+            activity: CHAPSTICK_MEETING_ACTIVITY,
+            meetingId,
+            name,
+            startsAt,
+            location,
+            reminderMinutes,
+            published,
+          },
+          channels: [teamChannel],
+        },
+        session.value,
+      );
+      await graffiti.post(
+        {
+          value: {
+            activity: MEETING_ANNOUNCEMENT_ACTIVITY,
+            meetingId,
+            name,
+            startsAt,
+            location,
+            reminderMinutes,
+            published,
+          },
+          channels: [teamChannel],
+        },
+        session.value,
+      );
+      closeEditMeeting();
+    } finally {
+      isSavingEdit.value = false;
+    }
+  }
+
+  function onEditMeetingModalEscape(e) {
+    if (e.key === "Escape") closeEditMeeting();
+  }
+
+  watch(editMeetingOpen, (open) => {
+    if (open) {
+      document.addEventListener("keydown", onEditMeetingModalEscape);
+    } else {
+      document.removeEventListener("keydown", onEditMeetingModalEscape);
+    }
+  });
+
+  onUnmounted(() => {
+    document.removeEventListener("keydown", onEditMeetingModalEscape);
+  });
+
+  provide("openEditMeeting", openEditMeeting);
+  provide("closeEditMeeting", closeEditMeeting);
+
+  const reminderTimers = new Map();
+  const reminderPending = new Set();
+  const reminderSentPrefix = "chapstick-reminder-sent:v1:";
+
+  function reminderKey(o) {
+    const id = o.value?.meetingId;
+    const startsAt = o.value?.startsAt;
+    const reminderMinutes = o.value?.reminderMinutes;
+    const ch = o.channels?.[0];
+    if (!id || typeof startsAt !== "number" || !ch) return "";
+    return `${id}:${startsAt}:${reminderMinutes}:${ch}`;
+  }
+
+  function clearReminderTimer(key) {
+    const t = reminderTimers.get(key);
+    if (t) {
+      clearTimeout(t);
+      reminderTimers.delete(key);
+    }
+  }
+
+  function latestYesRsvpActors(teamChannel, meetingId) {
+    const latestByActor = new Map();
+    for (const o of allTeamsRsvpObjects.value) {
+      if (o.channels?.[0] !== teamChannel) continue;
+      if (o.value?.meetingId !== meetingId) continue;
+      const actor = o.actor;
+      const prev = latestByActor.get(actor);
+      if (!prev || o.value.published > prev.value.published) {
+        latestByActor.set(actor, o);
+      }
+    }
+    return [...latestByActor.values()]
+      .filter((o) => o.value.response === "yes")
+      .map((o) => o.actor);
+  }
+
+  async function postReminderNotifications(o, published) {
+    const teamChannel = o.channels?.[0];
+    const meetingId = o.value?.meetingId;
+    if (!teamChannel || !meetingId || !session.value) return;
+    const recipients = latestYesRsvpActors(teamChannel, meetingId);
+    for (const actor of recipients) {
+      try {
+        await graffiti.post(
+          {
+            value: {
+              activity: TEAM_REMINDER_NOTIFICATION_ACTIVITY,
+              type: TEAM_REMINDER_NOTIFICATION_TYPE,
+              channel: teamChannel,
+              meetingId,
+              published,
+            },
+            channels: [DIRECTORY_CHANNEL],
+            allowed: [actor],
+          },
+          session.value,
+        );
+      } catch (e) {
+        console.error("reminder notification post", e);
+      }
+    }
+  }
+
+  async function postMeetingReminder(o) {
+    if (!session.value) return;
+    const teamChannel = o.channels?.[0];
+    const startsAt = o.value?.startsAt;
+    const reminderMinutes = o.value?.reminderMinutes;
+    if (!teamChannel || typeof startsAt !== "number") return;
+    if (!MEETING_REMINDER_MINUTES.includes(reminderMinutes)) return;
+    const key = reminderKey(o);
+    if (!key) return;
+    const storageKey = `${reminderSentPrefix}${key}`;
+    if (localStorage.getItem(storageKey)) return;
+    if (reminderPending.has(key)) return;
+    reminderPending.add(key);
+    const when = new Date(startsAt).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+    const content = `Reminder: "${o.value.name}" starts in ${reminderLabel(reminderMinutes)} (${when}) at ${o.value.location ?? "—"}.`;
+    try {
+      const published = Date.now();
+      await graffiti.post(
+        {
+          value: { content, published },
+          channels: [teamChannel],
+        },
+        session.value,
+      );
+      await postReminderNotifications(o, published);
+      localStorage.setItem(storageKey, "1");
+    } finally {
+      reminderPending.delete(key);
+    }
+  }
+
+  watch(
+    [allMeetingObjects, () => session.value?.actor],
+    ([meetings, actor]) => {
+      const activeKeys = new Set();
+      for (const o of meetings) {
+        const startsAt = o.value?.startsAt;
+        const reminderMinutes = o.value?.reminderMinutes;
+        if (o.value?.activity !== CHAPSTICK_MEETING_ACTIVITY) continue;
+        if (!actor || o.actor !== actor) continue;
+        if (!MEETING_REMINDER_MINUTES.includes(reminderMinutes)) continue;
+        if (typeof startsAt !== "number") continue;
+        const fireAt = startsAt - reminderMinutes * 60 * 1000;
+        const key = reminderKey(o);
+        if (!key) continue;
+        activeKeys.add(key);
+        const storageKey = `${reminderSentPrefix}${key}`;
+        if (localStorage.getItem(storageKey)) continue;
+        if (Date.now() >= startsAt) continue;
+        const delayMs = fireAt - Date.now();
+        if (delayMs <= 0) {
+          postMeetingReminder(o).catch(console.error);
+          continue;
+        }
+        if (reminderTimers.has(key)) continue;
+        const timer = setTimeout(() => {
+          reminderTimers.delete(key);
+          postMeetingReminder(o).catch(console.error);
+        }, delayMs);
+        reminderTimers.set(key, timer);
+      }
+      for (const key of reminderTimers.keys()) {
+        if (!activeKeys.has(key)) clearReminderTimer(key);
+      }
+    },
+    { immediate: true },
+  );
+
+  watch(activeChatId, (ch) => {
+    if (!ch) return;
+    localStorage.setItem(`${reminderNotificationSeenPrefix}${ch}`, `${Date.now()}`);
+  });
+
+  onUnmounted(() => {
+    for (const key of reminderTimers.keys()) clearReminderTimer(key);
+  });
 
   const teamCode = ref("");
   const isJoining = ref(false);
@@ -474,6 +813,16 @@ function setup() {
     joinError,
     leaveTeam,
     leavingTeamChannel,
+    editMeetingOpen,
+    editMeetingName,
+    editMeetingDateTime,
+    editMeetingLocation,
+    editMeetingReminderMinutes,
+    MEETING_REMINDER_MINUTES,
+    closeEditMeeting,
+    saveEditedMeeting,
+    isSavingEdit,
+    hasUnreadReminderNotification,
   };
 }
 

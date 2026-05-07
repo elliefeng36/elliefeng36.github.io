@@ -13,9 +13,11 @@ import {
   CHAPSTICK_MEETING_ACTIVITY,
   MEETING_ANNOUNCEMENT_ACTIVITY,
   MEETING_RSVP_ACTIVITY,
+  MEETING_REMINDER_MINUTES,
 } from "../meeting/shared-schemas.js";
 import RsvpButtons from "../components/rsvp.js";
 import ActorDisplay from "../components/actor-display.js";
+import EditMeetingButton from "../components/edit-meeting-button/edit-meeting-button.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -36,6 +38,11 @@ function setup() {
   const route = useRoute();
   const router = useRouter();
   const mergedTeams = inject("mergedTeams");
+  const hasUnreadReminderNotification = inject(
+    "hasUnreadReminderNotification",
+    () => false,
+  );
+  const closeEditMeeting = inject("closeEditMeeting", () => {});
 
   const channel = computed(() => {
     const id = route.params.chatID;
@@ -113,6 +120,7 @@ function setup() {
   const meetingName = ref("");
   const meetingDateTime = ref("");
   const meetingLocation = ref("");
+  const meetingReminderMinutes = ref(10);
   const isScheduling = ref(false);
 
   const { objects: meetingObjects, isFirstPoll: areMeetingObjectsLoading } =
@@ -136,6 +144,19 @@ function setup() {
     past.sort((a, b) => meetingTimeMs(b) - meetingTimeMs(a));
     return [...upcoming, ...past];
   });
+
+  function findMyChapMeetingForId(meetingId) {
+    const actor = session.value?.actor;
+    if (!actor || !meetingId) return null;
+    let best = null;
+    for (const o of meetingObjects.value) {
+      if (o.value.meetingId !== meetingId) continue;
+      if (o.value.activity !== CHAPSTICK_MEETING_ACTIVITY) continue;
+      if (o.actor !== actor) continue;
+      if (!best || o.value.published > best.value.published) best = o;
+    }
+    return best;
+  }
 
   const isSending = ref(false);
   async function sendMessage() {
@@ -171,9 +192,13 @@ function setup() {
   const scheduleMeetingOpen = ref(false);
 
   function openScheduleMeeting() {
-    if (channel.value && !meetingDateTime.value) {
-      meetingDateTime.value = defaultMeetingDatetimeLocal();
-    }
+    closeEditMeeting();
+    meetingName.value = "";
+    meetingLocation.value = "";
+    meetingReminderMinutes.value = 10;
+    meetingDateTime.value = channel.value
+      ? defaultMeetingDatetimeLocal()
+      : "";
     scheduleMeetingOpen.value = true;
   }
 
@@ -203,6 +228,7 @@ function setup() {
     const startsAt = new Date(meetingDateTime.value).getTime();
     const location = meetingLocation.value.trim() || "—";
     const name = meetingName.value.trim();
+    const reminderMinutes = Number(meetingReminderMinutes.value);
     const meetingId = crypto.randomUUID();
     const published = Date.now();
     try {
@@ -214,6 +240,7 @@ function setup() {
             name,
             startsAt,
             location,
+            reminderMinutes,
             published,
           },
           channels: [channel.value],
@@ -228,15 +255,18 @@ function setup() {
             name,
             startsAt,
             location,
+            reminderMinutes,
             published,
           },
           channels: [channel.value],
         },
         session.value,
       );
+      await submitRsvp(meetingId, "yes");
       meetingName.value = "";
       meetingDateTime.value = defaultMeetingDatetimeLocal();
       meetingLocation.value = "";
+      meetingReminderMinutes.value = 10;
       closeScheduleMeeting();
     } finally {
       isScheduling.value = false;
@@ -273,6 +303,7 @@ function setup() {
     } else {
       meetingDateTime.value = "";
       closeScheduleMeeting();
+      closeEditMeeting();
     }
   });
 
@@ -288,6 +319,8 @@ function setup() {
     meetingName,
     meetingDateTime,
     meetingLocation,
+    meetingReminderMinutes,
+    MEETING_REMINDER_MINUTES,
     isScheduling,
     schedMeeting,
     sortedMeetingObjects,
@@ -304,11 +337,14 @@ function setup() {
     scheduleMeetingOpen,
     openScheduleMeeting,
     closeScheduleMeeting,
+    findMyChapMeetingForId,
+    CHAPSTICK_MEETING_ACTIVITY,
+    hasUnreadReminderNotification,
   };
 }
 
 export default {
   template: "#template-chat",
-  components: { RsvpButtons, ActorDisplay },
+  components: { RsvpButtons, ActorDisplay, EditMeetingButton },
   setup,
 };

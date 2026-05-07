@@ -3,6 +3,7 @@
 export const CHAPSTICK_MEETING_ACTIVITY = "ChappystickMeeting";
 export const MEETING_ANNOUNCEMENT_ACTIVITY = "MeetingAnnouncement";
 export const MEETING_RSVP_ACTIVITY = "MeetingRsvp";
+export const MEETING_REMINDER_MINUTES = [5, 10, 30, 60, 120, 1440];
 
 /** Legacy meetings (no activity key). */
 const legacyMeetingValue = {
@@ -37,6 +38,7 @@ const newMeetingValue = {
     published: { type: "number" },
     startsAt: { type: "number" },
     location: { type: "string" },
+    reminderMinutes: { enum: MEETING_REMINDER_MINUTES },
   },
 };
 
@@ -77,6 +79,7 @@ const chatAnnouncementValue = {
     startsAt: { type: "number" },
     published: { type: "number" },
     location: { type: "string" },
+    reminderMinutes: { enum: MEETING_REMINDER_MINUTES },
   },
 };
 

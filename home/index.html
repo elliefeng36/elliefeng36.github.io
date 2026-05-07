@@ -16,67 +16,202 @@
           <p v-if="areAllMeetingsLoading" class="muted loading-line">
             Loading meetings…
           </p>
-          <ul v-else-if="allMeetingsDisplay.length" class="home-meetings-list">
-            <li
-              v-for="row in allMeetingsDisplay"
-              :key="row.object.url"
-              class="home-meeting-row"
+          <template v-else>
+            <ul
+              v-if="homeMeetingsUpcoming.length"
+              class="home-meetings-list"
             >
-              <div class="home-meeting-main">
-                <router-link
+              <li
+                v-for="row in homeMeetingsUpcoming"
+                :key="row.object.url"
+                class="home-meeting-row"
+                :class="{
+                  'meeting-row--editable-hover':
+                    row.object.actor === $graffitiSession.value?.actor &&
+                    row.object.value.meetingId,
+                  'home-meeting-row--has-reminder':
+                    hasUnreadReminderNotification(row.teamChannel),
+                }"
+              >
+                <span
+                  v-if="hasUnreadReminderNotification(row.teamChannel)"
+                  class="meeting-notification-dot"
+                  aria-label="Unread meeting reminder"
+                  title="Unread meeting reminder"
+                ></span>
+                <div class="home-meeting-main">
+                  <router-link
+                    v-if="row.object.value.meetingId"
+                    class="home-meeting-title-link"
+                    :to="{
+                      name: 'meeting',
+                      params: { meetingID: row.object.value.meetingId },
+                    }"
+                  >
+                    {{ row.object.value.name }}
+                  </router-link>
+                  <span v-else class="home-meeting-title">{{
+                    row.object.value.name
+                  }}</span>
+                  <edit-meeting-button :meeting-object="row.object" />
+                  <span class="home-meeting-when">{{
+                    new Date(
+                      row.object.value.startsAt ??
+                        row.object.value.date ??
+                        row.object.value.published,
+                    ).toLocaleString(undefined, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })
+                  }}</span>
+                </div>
+                <div class="home-meeting-meta">
+                  <router-link
+                    class="home-meeting-team-link"
+                    :to="{ name: 'chat', params: { chatID: row.teamChannel } }"
+                    >{{ row.teamTitle }}</router-link
+                  >
+                </div>
+                <div
                   v-if="row.object.value.meetingId"
-                  class="home-meeting-title-link"
-                  :to="{
-                    name: 'meeting',
-                    params: { meetingID: row.object.value.meetingId },
+                  class="rsvp-row home-meeting-rsvp"
+                >
+                  <rsvp-buttons
+                    compact
+                    :your-response="
+                      homeLatestOwnRsvp(row.object.value.meetingId)?.value
+                        ?.response ?? null
+                    "
+                    :busy-yes="
+                      homeMeetingRsvpBusy.has(
+                        row.object.value.meetingId + ':yes',
+                      )
+                    "
+                    :busy-no="
+                      homeMeetingRsvpBusy.has(
+                        row.object.value.meetingId + ':no',
+                      )
+                    "
+                    @yes="
+                      submitHomeMeetingRsvp(
+                        row.object.value.meetingId,
+                        'yes',
+                        row.teamChannel,
+                      )
+                    "
+                    @no="
+                      submitHomeMeetingRsvp(
+                        row.object.value.meetingId,
+                        'no',
+                        row.teamChannel,
+                      )
+                    "
+                  />
+                </div>
+              </li>
+            </ul>
+            <details
+              v-if="homeMeetingsPast.length"
+              class="home-meetings-past-details"
+            >
+              <summary class="home-meetings-past-summary">
+                Past meetings
+                <span class="home-meetings-past-count">{{
+                  homeMeetingsPast.length
+                }}</span>
+              </summary>
+              <ul class="home-meetings-list home-meetings-list--past">
+                <li
+                  v-for="row in homeMeetingsPast"
+                  :key="row.object.url"
+                  class="home-meeting-row home-meeting-row--past"
+                  :class="{
+                    'meeting-row--editable-hover':
+                      row.object.actor === $graffitiSession.value?.actor &&
+                      row.object.value.meetingId,
                   }"
                 >
-                  {{ row.object.value.name }}
-                </router-link>
-                <span v-else class="home-meeting-title"
-                  >{{ row.object.value.name }}</span
-                >
-                <span class="home-meeting-when"
-                  >{{ new Date( row.object.value.startsAt ??
-                  row.object.value.date ?? row.object.value.published,
-                  ).toLocaleString(undefined, { dateStyle: "medium", timeStyle:
-                  "short", }) }}</span
-                >
-              </div>
-              <div class="home-meeting-meta">
-                <router-link
-                  class="home-meeting-team-link"
-                  :to="{ name: 'chat', params: { chatID: row.teamChannel } }"
-                  >{{ row.teamTitle }}</router-link
-                >
-              </div>
-              <div
-                v-if="row.object.value.meetingId"
-                class="rsvp-row home-meeting-rsvp"
-              >
-                <rsvp-buttons
-                  compact
-                  :your-response="
-                    homeLatestOwnRsvp(row.object.value.meetingId)?.value.response ??
-                    null
-                  "
-                  :busy-yes="
-                    homeMeetingRsvpBusy.has(row.object.value.meetingId + ':yes')
-                  "
-                  :busy-no="
-                    homeMeetingRsvpBusy.has(row.object.value.meetingId + ':no')
-                  "
-                  @yes="
-                    submitHomeMeetingRsvp(row.object.value.meetingId, 'yes', row.teamChannel)
-                  "
-                  @no="
-                    submitHomeMeetingRsvp(row.object.value.meetingId, 'no', row.teamChannel)
-                  "
-                />
-              </div>
-            </li>
-          </ul>
-          <p v-else class="muted">No meetings yet.</p>
+                  <div class="home-meeting-main">
+                    <router-link
+                      v-if="row.object.value.meetingId"
+                      class="home-meeting-title-link"
+                      :to="{
+                        name: 'meeting',
+                        params: { meetingID: row.object.value.meetingId },
+                      }"
+                    >
+                      {{ row.object.value.name }}
+                    </router-link>
+                    <span v-else class="home-meeting-title">{{
+                      row.object.value.name
+                    }}</span>
+                    <edit-meeting-button :meeting-object="row.object" />
+                    <span class="home-meeting-when">{{
+                      new Date(
+                        row.object.value.startsAt ??
+                          row.object.value.date ??
+                          row.object.value.published,
+                      ).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })
+                    }}</span>
+                  </div>
+                  <div class="home-meeting-meta">
+                    <router-link
+                      class="home-meeting-team-link"
+                      :to="{ name: 'chat', params: { chatID: row.teamChannel } }"
+                      >{{ row.teamTitle }}</router-link
+                    >
+                  </div>
+                  <div
+                    v-if="row.object.value.meetingId"
+                    class="rsvp-row home-meeting-rsvp"
+                  >
+                    <rsvp-buttons
+                      compact
+                      :your-response="
+                        homeLatestOwnRsvp(row.object.value.meetingId)?.value
+                          ?.response ?? null
+                      "
+                      :busy-yes="
+                        homeMeetingRsvpBusy.has(
+                          row.object.value.meetingId + ':yes',
+                        )
+                      "
+                      :busy-no="
+                        homeMeetingRsvpBusy.has(
+                          row.object.value.meetingId + ':no',
+                        )
+                      "
+                      @yes="
+                        submitHomeMeetingRsvp(
+                          row.object.value.meetingId,
+                          'yes',
+                          row.teamChannel,
+                        )
+                      "
+                      @no="
+                        submitHomeMeetingRsvp(
+                          row.object.value.meetingId,
+                          'no',
+                          row.teamChannel,
+                        )
+                      "
+                    />
+                  </div>
+                </li>
+              </ul>
+            </details>
+            <p
+              v-if="
+                !homeMeetingsUpcoming.length && !homeMeetingsPast.length
+              "
+              class="muted"
+            >
+              No meetings yet.
+            </p>
+          </template>
         </section>
 
         <div class="main-empty">

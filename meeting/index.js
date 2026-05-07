@@ -10,9 +10,11 @@ import {
   rsvpObjectSchema,
   meetingTimeMs,
   MEETING_RSVP_ACTIVITY,
+  CHAPSTICK_MEETING_ACTIVITY,
 } from "./shared-schemas.js";
 import RsvpButtons from "../components/rsvp.js";
 import ActorDisplay from "../components/actor-display.js";
+import EditMeetingButton from "../components/edit-meeting-button/edit-meeting-button.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -136,6 +138,15 @@ function setup() {
     }
   }
 
+  const canEditMeeting = computed(() => {
+    const o = meetingObject.value;
+    const actor = session.value?.actor;
+    if (!o?.value?.meetingId || !actor) return false;
+    if (o.value.activity !== CHAPSTICK_MEETING_ACTIVITY) return false;
+    if (o.actor !== actor) return false;
+    return true;
+  });
+
   return {
     meetingObject,
     meetingIdParam,
@@ -151,11 +162,12 @@ function setup() {
     postRsvp,
     ownRsvpResponse,
     rsvpSubmitting,
+    canEditMeeting,
   };
 }
 
 export default {
   template: "#template-meeting",
-  components: { RsvpButtons, ActorDisplay },
+  components: { RsvpButtons, ActorDisplay, EditMeetingButton },
   setup,
 };

@@ -59,6 +59,57 @@ body {
   min-height: 100%;
 }
 
+/* Initial shell while scripts and Vue mount (replaced when app loads) */
+.app-boot {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.app-boot__throbber {
+  display: flex;
+  gap: 7px;
+  align-items: flex-end;
+  justify-content: center;
+  height: 36px;
+}
+
+.app-boot__bar {
+  width: 7px;
+  height: 28px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to top,
+    var(--warm-deep),
+    var(--warm-bright)
+  );
+  transform-origin: bottom center;
+  animation: app-boot-throb 0.7s ease-in-out infinite;
+}
+
+.app-boot__bar:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.app-boot__bar:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+@keyframes app-boot-throb {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+    opacity: 0.45;
+  }
+
+  50% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
 .app {
   min-height: 100vh;
 }
@@ -458,6 +509,20 @@ body {
   flex-shrink: 0;
 }
 
+.join-code-inline {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-width: 0;
+  gap: 0.15rem;
+  padding: 0.06rem 0.2rem 0.06rem 0.45rem;
+  vertical-align: middle;
+  background: rgba(92, 159, 212, 0.08);
+  border: 1px solid rgba(92, 159, 212, 0.28);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
 .join-code-value {
   display: inline-block;
   width: fit-content;
@@ -468,11 +533,29 @@ body {
   box-sizing: border-box;
 }
 
+.join-code-inline .join-code-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .btn-copy-code {
   flex-shrink: 0;
   padding: 0.28rem 0.65rem;
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.join-code-inline .btn-copy-code {
+  margin: 0.06rem 0.06rem 0.06rem 0;
+  padding: 0.22rem 0.5rem;
+  border-color: transparent;
+  background: transparent;
+}
+
+.join-code-inline .btn-copy-code:hover:not(:disabled) {
+  color: var(--accent);
+  background: rgba(92, 159, 212, 0.14);
+  border-color: transparent;
 }
 
 .inline-code {
@@ -488,6 +571,10 @@ body {
 
 .inline-code.join-code-value {
   margin-left: 0;
+  background: transparent;
+  border: none;
+  padding: 0.18rem 0.25rem 0.18rem 0;
+  color: var(--accent);
 }
 
 .main-empty {
@@ -619,6 +706,7 @@ body {
 }
 
 .meeting-card {
+  position: relative;
   padding: 0.28rem 0;
   border-bottom: 1px solid var(--border-soft);
   font-size: 0.84rem;
@@ -1028,6 +1116,42 @@ body {
   color: var(--text-muted);
 }
 
+.team-nav-meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.meeting-notification-dot {
+  position: absolute;
+  top: 0.42rem;
+  left: 0.1rem;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f97316;
+  box-shadow: 0 0 0 1px rgba(234, 88, 12, 0.45);
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.home-meeting-row--has-reminder {
+  padding-left: 0.72rem;
+}
+
+.meeting-card--has-reminder {
+  padding-left: 0.62rem;
+}
+
+.meetings-panel--header .meeting-card--has-reminder {
+  padding-left: 0.52rem;
+}
+
+.meetings-panel--header .meeting-notification-dot {
+  top: 0.15rem;
+}
+
 /* —— Controls —— */
 .input {
   width: 100%;
@@ -1144,6 +1268,45 @@ body {
   background: rgba(232, 93, 74, 0.28);
 }
 
+.btn-icon-pencil {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.btn-icon-pencil svg {
+  display: block;
+}
+
+.meetings-panel--header .btn-icon-pencil {
+  padding: 0.06rem 0.22rem;
+}
+
+.btn-icon-pencil:hover:not(:disabled) {
+  color: var(--accent);
+  background: rgba(92, 159, 212, 0.18);
+}
+
+/* Edit meeting pencil: hidden until hover/focus-within on parent row */
+.meeting-row--editable-hover .edit-meeting-button {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.meeting-row--editable-hover:hover .edit-meeting-button,
+.meeting-row--editable-hover:focus-within .edit-meeting-button {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meeting-row--editable-hover .edit-meeting-button {
+    opacity: 1;
+    transition: none;
+  }
+}
+
 @media (max-width: 820px) {
   .layout {
     flex-direction: column;
@@ -1210,7 +1373,60 @@ body {
   padding: 0;
 }
 
+.home-meetings-past-details {
+  margin-top: 0.65rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-soft);
+}
+
+.home-meetings-list + .home-meetings-past-details {
+  margin-top: 0.75rem;
+}
+
+.home-meetings-past-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text-muted);
+  user-select: none;
+  padding: 0.2rem 0;
+}
+
+.home-meetings-past-summary::-webkit-details-marker {
+  display: none;
+}
+
+.home-meetings-past-details[open] > .home-meetings-past-summary {
+  color: var(--text);
+}
+
+.home-meetings-past-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-soft);
+  color: var(--text-muted);
+}
+
+.home-meetings-list--past {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
+.home-meeting-row--past .home-meeting-title-link,
+.home-meeting-row--past .home-meeting-title {
+  color: var(--text-muted);
+}
+
 .home-meeting-row {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -1298,6 +1514,37 @@ body {
   font-size: 0.82rem;
 }
 
+.rsvp-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem 0.55rem;
+}
+
+@keyframes rsvp-btn-jump {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  40% {
+    transform: translateY(-5px);
+  }
+
+  70% {
+    transform: translateY(0);
+  }
+}
+
+.btn.rsvp-btn--jump {
+  animation: rsvp-btn-jump 0.26s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.rsvp-btn--jump {
+    animation: none;
+  }
+}
+
 .rsvp-row {
   display: flex;
   flex-wrap: wrap;
@@ -1363,6 +1610,18 @@ body {
 
 .meeting-page-body {
   max-width: 36rem;
+}
+
+.meeting-page-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.meeting-page-title-row .meeting-page-title {
+  margin: 0;
 }
 
 .meeting-page-title {
