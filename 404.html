@@ -114,6 +114,14 @@
                     :class="{ active: t.channel === activeChatId }"
                     :to="{ name: 'chat', params: { chatID: t.channel } }"
                   >
+                    <Transition name="team-reminder-dot">
+                      <span
+                        v-if="hasUnreadTeamSidebarNotification(t.channel)"
+                        class="meeting-notification-dot team-nav-meeting-reminder-dot"
+                        aria-label="Unread meeting reminder"
+                        title="Unread meeting reminder"
+                      ></span>
+                    </Transition>
                     <span class="team-nav-title">{{ t.title }}</span>
                     <span class="team-nav-meta"
                       >{{ t.channel.slice(0, 8) }}…</span

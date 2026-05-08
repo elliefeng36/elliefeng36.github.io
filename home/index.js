@@ -350,6 +350,26 @@ function setup() {
     return best;
   }
 
+  /** True if a meeting with this id on this team channel exists and is still upcoming. */
+  function meetingIsUpcomingOnChannel(teamChannel, meetingId) {
+    if (!teamChannel || !meetingId) return false;
+    const now = Date.now();
+    for (const mo of allMeetingObjects.value) {
+      if (mo.channels?.[0] !== teamChannel) continue;
+      if (mo.value?.meetingId !== meetingId) continue;
+      if (meetingTimeMs(mo) >= now) return true;
+    }
+    return false;
+  }
+
+  function userHasYesForMeeting(teamChannel, meetingId) {
+    const mine = latestOwnRsvp(meetingId);
+    return (
+      mine?.value.response === "yes" &&
+      meetingIsUpcomingOnChannel(teamChannel, meetingId)
+    );
+  }
+
   const homeMeetingRsvpBusy = ref(new Set());
   async function submitHomeMeetingRsvp(meetingId, response, teamChannel) {
     if (!teamChannel || !session.value) return;
@@ -378,6 +398,9 @@ function setup() {
   provide("homeMeetingRsvpBusy", homeMeetingRsvpBusy);
 
   const reminderNotificationSeenPrefix = "chapstick-reminder-seen:v1:";
+  const otherMeetingAnnouncementSeenPrefix = "chapstick-other-meeting-seen:v1:";
+  /** Bumped when marking a team "seen" so sidebar dots refresh without waiting on Graffiti poll. */
+  const teamSidebarNotificationEpoch = ref(0);
 
   function notificationSeenAt(channel) {
     const raw = localStorage.getItem(`${reminderNotificationSeenPrefix}${channel}`);
@@ -385,13 +408,22 @@ function setup() {
     return Number.isFinite(n) ? n : 0;
   }
 
+  function otherMeetingAnnouncementSeenAt(channel) {
+    const raw = localStorage.getItem(`${otherMeetingAnnouncementSeenPrefix}${channel}`);
+    const n = Number(raw ?? "0");
+    return Number.isFinite(n) ? n : 0;
+  }
+
   const unreadReminderCountByChannel = computed(() => {
+    void teamSidebarNotificationEpoch.value;
     const m = new Map();
     for (const o of teamReminderNotifications.value) {
       const ch = o.value?.channel;
+      const meetingId = o.value?.meetingId;
       const published = o.value?.published;
-      if (!ch || typeof published !== "number") continue;
+      if (!ch || !meetingId || typeof published !== "number") continue;
       if (published <= notificationSeenAt(ch)) continue;
+      if (!userHasYesForMeeting(ch, meetingId)) continue;
       m.set(ch, (m.get(ch) ?? 0) + 1);
     }
     return m;
@@ -414,6 +446,40 @@ function setup() {
   function isMeetingAnnouncementObject(o) {
     return o.value?.activity === MEETING_ANNOUNCEMENT_ACTIVITY;
   }
+
+  const hasUnreadOthersMeetingAnnouncementByChannel = computed(() => {
+    void teamSidebarNotificationEpoch.value;
+    const actor = session.value?.actor;
+    const show = new Map();
+    if (!actor) return show;
+    for (const o of teamFeedObjects.value) {
+      const ch = o.channels?.[0];
+      if (!ch) continue;
+      if (!isMeetingAnnouncementObject(o)) continue;
+      if (o.actor === actor) continue;
+      const meetingId = o.value?.meetingId;
+      const pub = o.value?.published;
+      if (!meetingId || typeof pub !== "number") continue;
+      if (pub <= otherMeetingAnnouncementSeenAt(ch)) continue;
+      if (!userHasYesForMeeting(ch, meetingId)) continue;
+      show.set(ch, true);
+    }
+    return show;
+  });
+
+  function hasUnreadOthersMeetingAnnouncement(channel) {
+    return hasUnreadOthersMeetingAnnouncementByChannel.value.get(channel) === true;
+  }
+
+  function hasUnreadTeamSidebarNotification(channel) {
+    return (
+      hasUnreadReminderNotification(channel) ||
+      hasUnreadOthersMeetingAnnouncement(channel)
+    );
+  }
+
+  provide("hasUnreadTeamSidebarNotification", hasUnreadTeamSidebarNotification);
+  provide("hasUnreadOthersMeetingAnnouncement", hasUnreadOthersMeetingAnnouncement);
 
   function closeEditMeeting() {
     editMeetingOpen.value = false;
@@ -655,7 +721,10 @@ function setup() {
 
   watch(activeChatId, (ch) => {
     if (!ch) return;
-    localStorage.setItem(`${reminderNotificationSeenPrefix}${ch}`, `${Date.now()}`);
+    const now = `${Date.now()}`;
+    localStorage.setItem(`${reminderNotificationSeenPrefix}${ch}`, now);
+    localStorage.setItem(`${otherMeetingAnnouncementSeenPrefix}${ch}`, now);
+    teamSidebarNotificationEpoch.value += 1;
   });
 
   onUnmounted(() => {
@@ -822,7 +891,7 @@ function setup() {
     closeEditMeeting,
     saveEditedMeeting,
     isSavingEdit,
-    hasUnreadReminderNotification,
+    hasUnreadTeamSidebarNotification,
   };
 }
 

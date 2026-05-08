@@ -85,6 +85,13 @@ function setup() {
     );
   });
 
+  const rsvpRowsYes = computed(() =>
+    rsvpRows.value.filter((o) => o.value.response === "yes"),
+  );
+  const rsvpRowsNo = computed(() =>
+    rsvpRows.value.filter((o) => o.value.response === "no"),
+  );
+
   const yesCount = computed(
     () => rsvpRows.value.filter((o) => o.value.response === "yes").length,
   );
@@ -151,7 +158,8 @@ function setup() {
     meetingObject,
     meetingIdParam,
     meetingTimeMs,
-    rsvpRows,
+    rsvpRowsYes,
+    rsvpRowsNo,
     yesCount,
     noCount,
     meetingsLoading,

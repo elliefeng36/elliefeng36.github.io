@@ -38,10 +38,6 @@ function setup() {
   const route = useRoute();
   const router = useRouter();
   const mergedTeams = inject("mergedTeams");
-  const hasUnreadReminderNotification = inject(
-    "hasUnreadReminderNotification",
-    () => false,
-  );
   const closeEditMeeting = inject("closeEditMeeting", () => {});
 
   const channel = computed(() => {
@@ -339,7 +335,6 @@ function setup() {
     closeScheduleMeeting,
     findMyChapMeetingForId,
     CHAPSTICK_MEETING_ACTIVITY,
-    hasUnreadReminderNotification,
   };
 }
 

@@ -29,16 +29,8 @@
                   'meeting-row--editable-hover':
                     row.object.actor === $graffitiSession.value?.actor &&
                     row.object.value.meetingId,
-                  'home-meeting-row--has-reminder':
-                    hasUnreadReminderNotification(row.teamChannel),
                 }"
               >
-                <span
-                  v-if="hasUnreadReminderNotification(row.teamChannel)"
-                  class="meeting-notification-dot"
-                  aria-label="Unread meeting reminder"
-                  title="Unread meeting reminder"
-                ></span>
                 <div class="home-meeting-main">
                   <router-link
                     v-if="row.object.value.meetingId"

@@ -48,20 +48,8 @@
                       object.actor === $graffitiSession.value?.actor &&
                       object.value.meetingId &&
                       object.value.activity === CHAPSTICK_MEETING_ACTIVITY,
-                    'meeting-card--has-reminder':
-                      hasUnreadReminderNotification(channel) &&
-                      !isMeetingPast(object),
                   }"
                 >
-                  <span
-                    v-if="
-                      hasUnreadReminderNotification(channel) &&
-                      !isMeetingPast(object)
-                    "
-                    class="meeting-notification-dot"
-                    aria-label="Unread meeting reminder"
-                    title="Unread meeting reminder"
-                  ></span>
                   <div class="meeting-card-head">
                     <div class="meeting-bar-lead">
                       <div class="meeting-name-row">

@@ -12,7 +12,6 @@ export default {
     const homeLatestOwnRsvp = inject("homeLatestOwnRsvp");
     const submitHomeMeetingRsvp = inject("submitHomeMeetingRsvp");
     const homeMeetingRsvpBusy = inject("homeMeetingRsvpBusy");
-    const hasUnreadReminderNotification = inject("hasUnreadReminderNotification");
     return {
       homeMeetingsUpcoming,
       homeMeetingsPast,
@@ -20,7 +19,6 @@ export default {
       homeLatestOwnRsvp,
       submitHomeMeetingRsvp,
       homeMeetingRsvpBusy,
-      hasUnreadReminderNotification,
     };
   },
 };

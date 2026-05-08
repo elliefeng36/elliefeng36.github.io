@@ -65,21 +65,44 @@
               />
             </div>
             <h3 class="meeting-rsvp-heading">Who responded</h3>
-            <p v-if="rsvpsLoading && !rsvpRows.length" class="muted">
+            <p v-if="rsvpsLoading && !rsvpRowsYes.length && !rsvpRowsNo.length" class="muted">
               Loading…
             </p>
-            <ul v-else-if="rsvpRows.length" class="meeting-rsvp-list">
-              <li v-for="o in rsvpRows" :key="o.url" class="meeting-rsvp-row">
-                <actor-display :actor="o.actor" />
-                <span
-                  class="rsvp-tag"
-                  :class="
-                    o.value.response === 'yes' ? 'rsvp-tag-yes' : 'rsvp-tag-no'
-                  "
-                  >{{ o.value.response }}</span
-                >
-              </li>
-            </ul>
+            <div
+              v-else-if="rsvpRowsYes.length || rsvpRowsNo.length"
+              class="meeting-rsvp-columns"
+            >
+              <div class="meeting-rsvp-column">
+                <h4 class="meeting-rsvp-column-title meeting-rsvp-column-title--yes">
+                  Yes
+                </h4>
+                <ul v-if="rsvpRowsYes.length" class="meeting-rsvp-list">
+                  <li
+                    v-for="o in rsvpRowsYes"
+                    :key="o.url"
+                    class="meeting-rsvp-row"
+                  >
+                    <actor-display :actor="o.actor" />
+                  </li>
+                </ul>
+                <p v-else class="muted meeting-rsvp-column-empty">None</p>
+              </div>
+              <div class="meeting-rsvp-column">
+                <h4 class="meeting-rsvp-column-title meeting-rsvp-column-title--no">
+                  No
+                </h4>
+                <ul v-if="rsvpRowsNo.length" class="meeting-rsvp-list">
+                  <li
+                    v-for="o in rsvpRowsNo"
+                    :key="o.url"
+                    class="meeting-rsvp-row"
+                  >
+                    <actor-display :actor="o.actor" />
+                  </li>
+                </ul>
+                <p v-else class="muted meeting-rsvp-column-empty">None</p>
+              </div>
+            </div>
             <p v-else class="muted">No RSVPs yet.</p>
           </div>
         </template>
