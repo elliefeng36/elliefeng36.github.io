@@ -10,7 +10,29 @@
       <div class="chat-route">
         <header class="main-header main-header--chat">
           <div class="chat-header-info">
-            <h2 class="main-title">{{ currentTeamTitle }}</h2>
+            <div class="chat-title-row chat-title-row--editable">
+              <h2 class="main-title">{{ displayTeamTitle }}</h2>
+              <button
+                type="button"
+                class="btn-icon btn-icon-pencil chat-title-edit-btn"
+                title="Rename team"
+                aria-label="Rename team"
+                @click="openEditTeamTitle"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  width="15"
+                  height="15"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                  />
+                </svg>
+              </button>
+            </div>
             <p class="main-sub join-code-row">
               <span class="join-code-label">Join code</span>
               <span class="join-code-inline">
@@ -314,6 +336,55 @@
                     "
                   >
                     {{ isScheduling ? "Scheduling…" : "Add meeting" }}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div
+            v-if="editTeamTitleOpen"
+            class="modal-backdrop"
+            @click.self="closeEditTeamTitle()"
+          >
+            <div
+              class="modal-dialog schedule-meeting-dialog"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-team-title-heading"
+              @click.stop
+            >
+              <h2 id="edit-team-title-heading" class="modal-title">
+                Rename team
+              </h2>
+              <form
+                class="meeting-form meeting-form--modal"
+                @submit.prevent="saveTeamTitle()"
+              >
+                <input
+                  class="input meeting-form-name"
+                  type="text"
+                  v-model="editTeamTitleDraft"
+                  placeholder="Team name"
+                  autocomplete="off"
+                />
+                <div class="modal-actions">
+                  <button
+                    type="button"
+                    class="btn btn-ghost"
+                    :disabled="isSavingTeamTitle"
+                    @click="closeEditTeamTitle()"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="btn btn-primary"
+                    :disabled="
+                      !editTeamTitleDraft.trim() || isSavingTeamTitle
+                    "
+                  >
+                    {{ isSavingTeamTitle ? "Saving…" : "Save" }}
                   </button>
                 </div>
               </form>

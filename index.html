@@ -67,8 +67,41 @@
           </div>
         </div>
 
-        <div v-else class="layout">
-          <aside class="sidebar">
+        <div
+          v-else
+          class="layout"
+          :class="{ 'layout--sidebar-open': sidebarMobileOpen }"
+        >
+          <div
+            v-show="sidebarMobileOpen"
+            class="sidebar-mobile-backdrop"
+            aria-hidden="true"
+            @click="sidebarMobileOpen = false"
+          ></div>
+
+          <button
+            type="button"
+            class="sidebar-open-btn"
+            aria-label="Open navigation menu"
+            :aria-expanded="sidebarMobileOpen"
+            aria-controls="app-sidebar"
+            @click="sidebarMobileOpen = true"
+          >
+            <span class="sidebar-logo" aria-hidden="true">◆</span>
+          </button>
+
+          <aside id="app-sidebar" class="sidebar">
+            <div class="sidebar-mobile-top">
+              <button
+                type="button"
+                class="btn btn-ghost sidebar-mobile-close"
+                aria-label="Close menu"
+                @click="sidebarMobileOpen = false"
+              >
+                Close
+              </button>
+            </div>
+
             <router-link class="sidebar-brand sidebar-brand-link" to="/">
               <span class="sidebar-logo">◆</span>
               <div>
@@ -177,9 +210,68 @@
             </div>
           </aside>
 
-          <main class="main">
+          <main class="main main--mobile-pad">
             <router-view />
           </main>
+
+          <aside
+            v-if="activeChatId"
+            id="members-bar"
+            class="members-bar"
+            :class="{ 'members-bar--collapsed': !membersPanelOpen }"
+          >
+            <div class="members-bar-inner">
+              <div class="members-bar-head">
+                <h3 class="members-bar-title">Members</h3>
+                <button
+                  type="button"
+                  class="btn-icon members-bar-toggle"
+                  :aria-expanded="membersPanelOpen"
+                  aria-controls="members-bar-list"
+                  :title="membersPanelOpen ? 'Collapse' : 'Expand'"
+                  :aria-label="membersPanelOpen ? 'Collapse members' : 'Expand members'"
+                  @click="toggleMembersPanel()"
+                >
+                  <span class="members-bar-toggle-text" aria-hidden="true">{{
+                    membersPanelOpen ? "»" : "«"
+                  }}</span>
+                </button>
+              </div>
+              <ul
+                id="members-bar-list"
+                v-show="membersPanelOpen"
+                class="members-bar-list"
+              >
+                <li
+                  v-for="actor in chatMemberActors"
+                  :key="actor"
+                  class="members-bar-row"
+                >
+                  <actor-display :actor="actor" />
+                </li>
+              </ul>
+              <p
+                v-if="
+                  membersPanelOpen &&
+                    presenceMembersFirstPoll &&
+                    !chatMemberActors.length
+                "
+                class="members-bar-status muted"
+              >
+                Loading members…
+              </p>
+              <p
+                v-else-if="
+                  membersPanelOpen &&
+                    !presenceMembersFirstPoll &&
+                    !chatMemberActors.length
+                "
+                class="members-bar-status muted"
+              >
+                No members yet.
+              </p>
+            </div>
+          </aside>
 
           <teleport to="body">
             <div

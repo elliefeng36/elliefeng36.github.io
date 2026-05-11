@@ -1,4 +1,11 @@
-import { ref, computed, provide, watch, onUnmounted } from "vue";
+import {
+  ref,
+  computed,
+  provide,
+  watch,
+  onMounted,
+  onUnmounted,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   useGraffiti,
@@ -15,6 +22,7 @@ import {
   MEETING_ANNOUNCEMENT_ACTIVITY,
   MEETING_REMINDER_MINUTES,
 } from "../meeting/shared-schemas.js";
+import ActorDisplay from "../components/actor-display.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -41,6 +49,38 @@ function setup() {
   const session = useGraffitiSession();
   const route = useRoute();
   const router = useRouter();
+
+  const sidebarMobileOpen = ref(false);
+  const MOBILE_LAYOUT_MQ = "(max-width: 820px)";
+
+  watch(
+    () => route.fullPath,
+    () => {
+      sidebarMobileOpen.value = false;
+    },
+  );
+
+  let removeSidebarMobileListeners = () => {};
+
+  onMounted(() => {
+    const mq = window.matchMedia(MOBILE_LAYOUT_MQ);
+    function onMqChange() {
+      if (!mq.matches) sidebarMobileOpen.value = false;
+    }
+    function onKeydown(e) {
+      if (e.key === "Escape") sidebarMobileOpen.value = false;
+    }
+    mq.addEventListener("change", onMqChange);
+    document.addEventListener("keydown", onKeydown);
+    removeSidebarMobileListeners = () => {
+      mq.removeEventListener("change", onMqChange);
+      document.removeEventListener("keydown", onKeydown);
+    };
+  });
+
+  onUnmounted(() => {
+    removeSidebarMobileListeners();
+  });
 
   const activeChatId = computed(() => {
     const id = route.params.chatID;
@@ -168,9 +208,13 @@ function setup() {
     true,
   );
 
-  const bookmarkChannelIds = computed(() => [
-    ...new Set(joinedBookmarks.value.map((o) => o.value.channel)),
-  ]);
+  /** Channels where we poll `TeamMeta` (created teams are not always bookmarked). */
+  const teamChannelIdsForMeta = computed(() => {
+    const ids = new Set();
+    for (const o of chats.value) ids.add(o.value.channel);
+    for (const o of joinedBookmarks.value) ids.add(o.value.channel);
+    return [...ids];
+  });
 
   const teamMetaSchema = {
     properties: {
@@ -187,7 +231,7 @@ function setup() {
   };
 
   const { objects: teamMetaObjects } = useGraffitiDiscover(
-    () => bookmarkChannelIds.value,
+    () => teamChannelIdsForMeta.value,
     teamMetaSchema,
     session,
     true,
@@ -220,6 +264,47 @@ function setup() {
       if (t > prev) m.set(ch, t);
     }
     return m;
+  });
+
+  const presenceLeaveSchema = {
+    properties: {
+      value: {
+        required: ["activity", "type", "published"],
+        properties: {
+          activity: { const: "MemberPresence" },
+          type: { const: "Presence" },
+          published: { type: "number" },
+        },
+      },
+    },
+  };
+
+  const { objects: allTeamPresenceObjects, isFirstPoll: presenceMembersFirstPoll } =
+    useGraffitiDiscover(
+      () => teamChannelIdsForMeta.value,
+      presenceLeaveSchema,
+      session,
+      true,
+    );
+
+  /** Latest `MemberPresence` timestamp per team (joins / new presence posts). */
+  const lastMemberPresenceTimeByChannel = computed(() => {
+    const m = new Map();
+    for (const o of allTeamPresenceObjects.value) {
+      const ch = o.channels?.[0];
+      if (!ch) continue;
+      const t = o.value?.published;
+      if (typeof t !== "number") continue;
+      const prev = m.get(ch) ?? 0;
+      if (t > prev) m.set(ch, t);
+    }
+    return m;
+  });
+
+  const teamPresenceMembers = computed(() => {
+    const ch = activeChatId.value;
+    if (!ch) return [];
+    return allTeamPresenceObjects.value.filter((o) => o.channels?.[0] === ch);
   });
 
   /** True while the directory / join-bookmark discovers have not finished their first poll yet. */
@@ -264,9 +349,16 @@ function setup() {
     }
 
     const lastMsg = lastMessageTimeByChannel.value;
+    const lastPresence = lastMemberPresenceTimeByChannel.value;
 
     const rows = [...byChannel.values()].map((row) => {
       const ch = row.channel;
+      const metaTitle = metaTitleByChannel.get(ch)?.title?.trim();
+      const baseTitle = row.title?.trim();
+      const title =
+        metaTitle ||
+        baseTitle ||
+        `Team (${ch.slice(0, 8)}…)`;
       let joinOrCreateTs = 0;
       for (const o of joinedBookmarks.value) {
         if (o.value.channel === ch) {
@@ -279,8 +371,9 @@ function setup() {
         }
       }
       const msgTs = lastMsg.get(ch) ?? 0;
-      const sortKey = Math.max(joinOrCreateTs, msgTs);
-      return { ...row, sortKey };
+      const presenceTs = lastPresence.get(ch) ?? 0;
+      const sortKey = Math.max(joinOrCreateTs, msgTs, presenceTs);
+      return { channel: ch, title, sortKey };
     });
 
     rows.sort((a, b) => b.sortKey - a.sortKey);
@@ -350,6 +443,11 @@ function setup() {
     return best;
   }
 
+  const reminderNotificationSeenPrefix = "chapstick-reminder-seen:v1:";
+  const otherMeetingAnnouncementSeenPrefix = "chapstick-other-meeting-seen:v1:";
+  /** Bumped when marking a team "seen" so sidebar dots refresh without waiting on Graffiti poll. */
+  const teamSidebarNotificationEpoch = ref(0);
+
   /** True if a meeting with this id on this team channel exists and is still upcoming. */
   function meetingIsUpcomingOnChannel(teamChannel, meetingId) {
     if (!teamChannel || !meetingId) return false;
@@ -396,11 +494,6 @@ function setup() {
   provide("homeLatestOwnRsvp", latestOwnRsvp);
   provide("submitHomeMeetingRsvp", submitHomeMeetingRsvp);
   provide("homeMeetingRsvpBusy", homeMeetingRsvpBusy);
-
-  const reminderNotificationSeenPrefix = "chapstick-reminder-seen:v1:";
-  const otherMeetingAnnouncementSeenPrefix = "chapstick-other-meeting-seen:v1:";
-  /** Bumped when marking a team "seen" so sidebar dots refresh without waiting on Graffiti poll. */
-  const teamSidebarNotificationEpoch = ref(0);
 
   function notificationSeenAt(channel) {
     const raw = localStorage.getItem(`${reminderNotificationSeenPrefix}${channel}`);
@@ -735,6 +828,34 @@ function setup() {
   const isJoining = ref(false);
   const joinError = ref("");
 
+  async function joinChannelAsMember(code, sess) {
+    const actor = sess.actor;
+    await graffiti.post(
+      {
+        value: {
+          activity: "Join",
+          type: "ChatBookmark",
+          channel: code,
+          published: Date.now(),
+        },
+        channels: [DIRECTORY_CHANNEL],
+        allowed: [actor],
+      },
+      sess,
+    );
+    await graffiti.post(
+      {
+        value: {
+          activity: "MemberPresence",
+          type: "Presence",
+          published: Date.now(),
+        },
+        channels: [code],
+      },
+      sess,
+    );
+  }
+
   async function joinTeam() {
     joinError.value = "";
     const code = teamCode.value.trim();
@@ -743,32 +864,8 @@ function setup() {
       return;
     }
     isJoining.value = true;
-    const actor = session.value.actor;
     try {
-      await graffiti.post(
-        {
-          value: {
-            activity: "Join",
-            type: "ChatBookmark",
-            channel: code,
-            published: Date.now(),
-          },
-          channels: [DIRECTORY_CHANNEL],
-          allowed: [actor],
-        },
-        session.value,
-      );
-      await graffiti.post(
-        {
-          value: {
-            activity: "MemberPresence",
-            type: "Presence",
-            published: Date.now(),
-          },
-          channels: [code],
-        },
-        session.value,
-      );
+      await joinChannelAsMember(code, session.value);
       teamCode.value = "";
       await router.push({ name: "chat", params: { chatID: code } });
     } catch (e) {
@@ -779,18 +876,68 @@ function setup() {
     }
   }
 
-  const presenceLeaveSchema = {
-    properties: {
-      value: {
-        required: ["activity", "type", "published"],
-        properties: {
-          activity: { const: "MemberPresence" },
-          type: { const: "Presence" },
-          published: { type: "number" },
-        },
-      },
+  /** When opening `/chat/:id` for a team you are not in yet, join the same way as the sidebar form (bookmark + presence). */
+  const autoJoinChatLock = ref("");
+
+  watch(
+    () => ({
+      ch: activeChatId.value,
+      loading: teamsListLoading.value,
+      teams: mergedTeams.value,
+      sess: session.value,
+    }),
+    async (cur, prev) => {
+      if (prev?.ch && cur.ch !== prev.ch && autoJoinChatLock.value === prev.ch) {
+        autoJoinChatLock.value = "";
+      }
+
+      if (cur.ch && cur.teams.some((t) => t.channel === cur.ch)) {
+        if (autoJoinChatLock.value === cur.ch) autoJoinChatLock.value = "";
+        return;
+      }
+
+      if (!cur.ch || !UUID_RE.test(cur.ch) || cur.loading || !cur.sess?.actor) {
+        if (!cur.ch) autoJoinChatLock.value = "";
+        return;
+      }
+
+      if (autoJoinChatLock.value === cur.ch) return;
+
+      autoJoinChatLock.value = cur.ch;
+      try {
+        await joinChannelAsMember(cur.ch, cur.sess);
+      } catch (e) {
+        console.error("auto-join chat", e);
+        joinError.value = "Could not join that team.";
+        autoJoinChatLock.value = "";
+        await router.replace({ name: "home" });
+      }
     },
-  };
+    { flush: "post" },
+  );
+
+  const chatMemberActors = computed(() => {
+    const me = session.value?.actor;
+    const actors = new Set();
+    for (const o of teamPresenceMembers.value) {
+      if (o.actor) actors.add(o.actor);
+    }
+    const list = [...actors];
+    list.sort((a, b) => {
+      if (me) {
+        if (a === me) return -1;
+        if (b === me) return 1;
+      }
+      return String(a).localeCompare(String(b));
+    });
+    return list;
+  });
+
+  const membersPanelOpen = ref(true);
+
+  function toggleMembersPanel() {
+    membersPanelOpen.value = !membersPanelOpen.value;
+  }
 
   async function drainDiscoverLeave(channels, schema) {
     if (!session.value?.actor || !channels?.length) return [];
@@ -870,6 +1017,11 @@ function setup() {
   }
 
   return {
+    sidebarMobileOpen,
+    membersPanelOpen,
+    toggleMembersPanel,
+    chatMemberActors,
+    presenceMembersFirstPoll,
     newChat,
     mergedTeams,
     teamsListLoading,
@@ -895,6 +1047,10 @@ function setup() {
   };
 }
 
-const AppLayout = { template: "#template-app", setup };
+const AppLayout = {
+  template: "#template-app",
+  setup,
+  components: { ActorDisplay },
+};
 
 export default AppLayout;

@@ -189,6 +189,7 @@ function setup() {
 
   function openScheduleMeeting() {
     closeEditMeeting();
+    closeEditTeamTitle();
     meetingName.value = "";
     meetingLocation.value = "";
     meetingReminderMinutes.value = 10;
@@ -212,10 +213,6 @@ function setup() {
     } else {
       document.removeEventListener("keydown", onScheduleModalEscape);
     }
-  });
-
-  onUnmounted(() => {
-    document.removeEventListener("keydown", onScheduleModalEscape);
   });
 
   async function schedMeeting() {
@@ -274,6 +271,67 @@ function setup() {
     return t?.title ?? "";
   });
 
+  const displayTeamTitle = computed(() => {
+    const s = currentTeamTitle.value.trim();
+    return s || "Untitled team";
+  });
+
+  const editTeamTitleOpen = ref(false);
+  const editTeamTitleDraft = ref("");
+  const isSavingTeamTitle = ref(false);
+
+  function openEditTeamTitle() {
+    if (!channel.value || !session.value) return;
+    closeEditMeeting();
+    closeScheduleMeeting();
+    editTeamTitleDraft.value = currentTeamTitle.value.trim();
+    editTeamTitleOpen.value = true;
+  }
+
+  function closeEditTeamTitle() {
+    editTeamTitleOpen.value = false;
+  }
+
+  async function saveTeamTitle() {
+    const title = editTeamTitleDraft.value.trim();
+    if (!channel.value || !session.value || !title) return;
+    isSavingTeamTitle.value = true;
+    try {
+      await graffiti.post(
+        {
+          value: {
+            activity: "TeamMeta",
+            type: "Title",
+            title,
+            published: Date.now(),
+          },
+          channels: [channel.value],
+        },
+        session.value,
+      );
+      closeEditTeamTitle();
+    } finally {
+      isSavingTeamTitle.value = false;
+    }
+  }
+
+  function onEditTeamTitleEscape(e) {
+    if (e.key === "Escape") closeEditTeamTitle();
+  }
+
+  watch(editTeamTitleOpen, (open) => {
+    if (open) {
+      document.addEventListener("keydown", onEditTeamTitleEscape);
+    } else {
+      document.removeEventListener("keydown", onEditTeamTitleEscape);
+    }
+  });
+
+  onUnmounted(() => {
+    document.removeEventListener("keydown", onScheduleModalEscape);
+    document.removeEventListener("keydown", onEditTeamTitleEscape);
+  });
+
   const teamCodeJustCopied = ref(false);
   let teamCodeCopyTimer = 0;
   async function copyTeamCode() {
@@ -294,6 +352,7 @@ function setup() {
   watch(channel, (ch) => {
     teamCodeJustCopied.value = false;
     clearTimeout(teamCodeCopyTimer);
+    closeEditTeamTitle();
     if (ch) {
       meetingDateTime.value = defaultMeetingDatetimeLocal();
     } else {
@@ -323,7 +382,13 @@ function setup() {
     areMeetingObjectsLoading,
     isMeetingPast,
     meetingTimeMs,
-    currentTeamTitle,
+    displayTeamTitle,
+    editTeamTitleOpen,
+    editTeamTitleDraft,
+    isSavingTeamTitle,
+    openEditTeamTitle,
+    closeEditTeamTitle,
+    saveTeamTitle,
     channel,
     copyTeamCode,
     teamCodeJustCopied,
