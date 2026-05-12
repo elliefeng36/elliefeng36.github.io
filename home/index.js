@@ -23,6 +23,11 @@ import {
   MEETING_REMINDER_MINUTES,
 } from "../meeting/shared-schemas.js";
 import ActorDisplay from "../components/actor-display.js";
+import {
+  addAutojoinDeny,
+  removeAutojoinDeny,
+  isAutojoinDenied,
+} from "../shared/autojoin-deny.js";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -208,12 +213,21 @@ function setup() {
     true,
   );
 
-  /** Channels where we poll `TeamMeta` (created teams are not always bookmarked). */
+  /**
+   * Bumped when the skip-autojoin deny set changes so team lists recompute immediately
+   * (`localStorage` updates are not reactive).
+   */
+  const teamSidebarDenylistEpoch = ref(0);
+
+  /** Channels where we poll `TeamMeta` / presence / meetings — sorted so discover keys do not change when chat activity reorders the sidebar. Omits teams you left (deny list) so stale discover rows cannot flicker them back in. */
   const teamChannelIdsForMeta = computed(() => {
+    void teamSidebarDenylistEpoch.value;
     const ids = new Set();
     for (const o of chats.value) ids.add(o.value.channel);
     for (const o of joinedBookmarks.value) ids.add(o.value.channel);
-    return [...ids];
+    return [...ids]
+      .filter((ch) => !isAutojoinDenied(ch))
+      .sort();
   });
 
   const teamMetaSchema = {
@@ -237,13 +251,8 @@ function setup() {
     true,
   );
 
-  /** All team channel ids (created or bookmarked) for feed activity. */
-  const teamChannelsForActivity = computed(() => {
-    const ids = new Set();
-    for (const o of chats.value) ids.add(o.value.channel);
-    for (const o of joinedBookmarks.value) ids.add(o.value.channel);
-    return [...ids];
-  });
+  /** Same channel set as `teamChannelIdsForMeta` (feed + meta + presence + meetings). */
+  const teamChannelsForActivity = teamChannelIdsForMeta;
 
   const { objects: teamFeedObjects } = useGraffitiDiscover(
     () => teamChannelsForActivity.value,
@@ -251,20 +260,6 @@ function setup() {
     session,
     true,
   );
-
-  /** Latest message `published` time per team channel (chat + announcements). */
-  const lastMessageTimeByChannel = computed(() => {
-    const m = new Map();
-    for (const o of teamFeedObjects.value) {
-      const ch = o.channels?.[0];
-      if (!ch) continue;
-      const t = o.value?.published;
-      if (typeof t !== "number") continue;
-      const prev = m.get(ch) ?? 0;
-      if (t > prev) m.set(ch, t);
-    }
-    return m;
-  });
 
   const presenceLeaveSchema = {
     properties: {
@@ -287,20 +282,6 @@ function setup() {
       true,
     );
 
-  /** Latest `MemberPresence` timestamp per team (joins / new presence posts). */
-  const lastMemberPresenceTimeByChannel = computed(() => {
-    const m = new Map();
-    for (const o of allTeamPresenceObjects.value) {
-      const ch = o.channels?.[0];
-      if (!ch) continue;
-      const t = o.value?.published;
-      if (typeof t !== "number") continue;
-      const prev = m.get(ch) ?? 0;
-      if (t > prev) m.set(ch, t);
-    }
-    return m;
-  });
-
   const teamPresenceMembers = computed(() => {
     const ch = activeChatId.value;
     if (!ch) return [];
@@ -313,6 +294,7 @@ function setup() {
   );
 
   const mergedTeams = computed(() => {
+    void teamSidebarDenylistEpoch.value;
     const metaTitleByChannel = new Map();
     for (const o of teamMetaObjects.value) {
       const ch = o.channels?.[0];
@@ -348,9 +330,6 @@ function setup() {
       }
     }
 
-    const lastMsg = lastMessageTimeByChannel.value;
-    const lastPresence = lastMemberPresenceTimeByChannel.value;
-
     const rows = [...byChannel.values()].map((row) => {
       const ch = row.channel;
       const metaTitle = metaTitleByChannel.get(ch)?.title?.trim();
@@ -370,21 +349,20 @@ function setup() {
           joinOrCreateTs = Math.max(joinOrCreateTs, o.value.published);
         }
       }
-      const msgTs = lastMsg.get(ch) ?? 0;
-      const presenceTs = lastPresence.get(ch) ?? 0;
-      const sortKey = Math.max(joinOrCreateTs, msgTs, presenceTs);
-      return { channel: ch, title, sortKey };
+      return { channel: ch, title, sortKey: joinOrCreateTs };
     });
 
     rows.sort((a, b) => b.sortKey - a.sortKey);
-    return rows.map(({ sortKey, ...rest }) => rest);
+    return rows
+      .map(({ sortKey, ...rest }) => rest)
+      .filter((r) => !isAutojoinDenied(r.channel));
   });
 
   provide("mergedTeams", mergedTeams);
 
   const { objects: allMeetingObjects, isFirstPoll: areAllMeetingsLoading } =
     useGraffitiDiscover(
-      () => mergedTeams.value.map((t) => t.channel),
+      () => teamChannelIdsForMeta.value,
       meetingObjectSchema,
       session,
       true,
@@ -426,7 +404,7 @@ function setup() {
   provide("areAllMeetingsLoading", areAllMeetingsLoading);
 
   const { objects: allTeamsRsvpObjects } = useGraffitiDiscover(
-    () => mergedTeams.value.map((t) => t.channel),
+    () => teamChannelIdsForMeta.value,
     rsvpObjectSchema,
     session,
     true,
@@ -863,6 +841,8 @@ function setup() {
       joinError.value = "Join code must be a valid team id (UUID).";
       return;
     }
+    removeAutojoinDeny(code);
+    teamSidebarDenylistEpoch.value += 1;
     isJoining.value = true;
     try {
       await joinChannelAsMember(code, session.value);
@@ -878,6 +858,8 @@ function setup() {
 
   /** When opening `/chat/:id` for a team you are not in yet, join the same way as the sidebar form (bookmark + presence). */
   const autoJoinChatLock = ref("");
+  /** Avoids spamming `router.replace` while `mergedTeams` recomputes every discover tick for the same denied chat URL. */
+  const denyHomeNavLock = ref("");
 
   watch(
     () => ({
@@ -890,14 +872,34 @@ function setup() {
       if (prev?.ch && cur.ch !== prev.ch && autoJoinChatLock.value === prev.ch) {
         autoJoinChatLock.value = "";
       }
+      if (prev?.ch && cur.ch !== prev.ch && denyHomeNavLock.value === prev.ch) {
+        denyHomeNavLock.value = "";
+      }
 
-      if (cur.ch && cur.teams.some((t) => t.channel === cur.ch)) {
-        if (autoJoinChatLock.value === cur.ch) autoJoinChatLock.value = "";
+      if (!cur.ch || !UUID_RE.test(cur.ch)) {
+        if (!cur.ch) {
+          autoJoinChatLock.value = "";
+          denyHomeNavLock.value = "";
+        }
         return;
       }
 
-      if (!cur.ch || !UUID_RE.test(cur.ch) || cur.loading || !cur.sess?.actor) {
-        if (!cur.ch) autoJoinChatLock.value = "";
+      if (cur.teams.some((t) => t.channel === cur.ch)) {
+        if (autoJoinChatLock.value === cur.ch) autoJoinChatLock.value = "";
+        if (denyHomeNavLock.value === cur.ch) denyHomeNavLock.value = "";
+        return;
+      }
+
+      if (isAutojoinDenied(cur.ch)) {
+        if (autoJoinChatLock.value === cur.ch) autoJoinChatLock.value = "";
+        if (route.name !== "chat") return;
+        if (denyHomeNavLock.value === cur.ch) return;
+        denyHomeNavLock.value = cur.ch;
+        await router.replace({ name: "home" });
+        return;
+      }
+
+      if (cur.loading || !cur.sess?.actor) {
         return;
       }
 
@@ -939,28 +941,11 @@ function setup() {
     membersPanelOpen.value = !membersPanelOpen.value;
   }
 
-  async function drainDiscoverLeave(channels, schema) {
-    if (!session.value?.actor || !channels?.length) return [];
-    const list = [];
-    try {
-      const stream = graffiti.discover(channels, schema, session.value);
-      for await (const ev of stream) {
-        if (ev?.error) continue;
-        if (ev?.tombstone) continue;
-        if (ev?.object) list.push(ev.object);
-      }
-    } catch (e) {
-      console.error("discover leave", e);
-    }
-    return list;
-  }
-
-  async function deleteMineMatching(list, pred) {
+  async function deleteMyObjects(objects) {
     const actor = session.value?.actor;
     if (!actor) return;
-    for (const o of list) {
+    for (const o of objects) {
       if (o.actor !== actor) continue;
-      if (pred && !pred(o)) continue;
       try {
         await graffiti.delete(o, session.value);
       } catch (e) {
@@ -982,32 +967,27 @@ function setup() {
     }
     leavingTeamChannel.value = teamChannel;
     try {
-      const dirBookmarks = await drainDiscoverLeave(
-        [DIRECTORY_CHANNEL],
-        joinBookmarkSchema,
+      addAutojoinDeny(teamChannel);
+      teamSidebarDenylistEpoch.value += 1;
+      const actor = session.value.actor;
+      /** Use synced discover caches — a one-shot `discover()` only returns the first page, so re-discovering often missed directory rows. */
+      const bookmarkRows = joinedBookmarks.value.filter(
+        (o) => o.value.channel === teamChannel && o.actor === actor,
       );
-      await deleteMineMatching(
-        dirBookmarks,
-        (o) => o.value.channel === teamChannel,
+      const createRows = chats.value.filter(
+        (o) => o.value.channel === teamChannel && o.actor === actor,
+      );
+      const presenceRows = allTeamPresenceObjects.value.filter(
+        (o) => o.channels?.[0] === teamChannel && o.actor === actor,
+      );
+      const metaRows = teamMetaObjects.value.filter(
+        (o) => o.channels?.[0] === teamChannel && o.actor === actor,
       );
 
-      const dirCreates = await drainDiscoverLeave(
-        [DIRECTORY_CHANNEL],
-        chatDirectorySchema,
-      );
-      await deleteMineMatching(
-        dirCreates,
-        (o) => o.value.channel === teamChannel,
-      );
-
-      const presences = await drainDiscoverLeave(
-        [teamChannel],
-        presenceLeaveSchema,
-      );
-      await deleteMineMatching(presences, null);
-
-      const metas = await drainDiscoverLeave([teamChannel], teamMetaSchema);
-      await deleteMineMatching(metas, null);
+      await deleteMyObjects(bookmarkRows);
+      await deleteMyObjects(createRows);
+      await deleteMyObjects(presenceRows);
+      await deleteMyObjects(metaRows);
     } finally {
       leavingTeamChannel.value = null;
       if (activeChatId.value === teamChannel) {
